@@ -1,0 +1,329 @@
+import google.generativeai as genai
+import fitz  # PyMuPDF
+import json
+import time
+import re
+import logging
+import chromadb
+from tqdm import tqdm
+from django.conf import settings
+
+# Django 로거 설정
+logger = logging.getLogger(__name__)
+
+# --- 0. 모델 및 클라이언트 초기화 ---
+# (이 함수들은 tasks.py에서 호출됩니다)
+def init_gemini_models():
+    """Gemini 모델 객체들을 초기화하고 딕셔너리로 반환"""
+    print("Initializing Gemini models...")
+    try:
+        genai.configure(api_key=settings.GEMINI_API_KEY)
+        models = {
+            'flash': genai.GenerativeModel(settings.MODEL_FLASH),
+            # 'pro': genai.GenerativeModel(settings.MODEL_PRO), # Pro 모델이 있다면 주석 해제
+            'embedding': settings.MODEL_EMBEDDING
+        }
+        print("Gemini models initialized.")
+        return models
+    except Exception as e:
+        logger.error(f"Error initializing Gemini: {e}")
+        raise
+
+def init_chromadb_client():
+    """ChromaDB 클라이언트 초기화 (Persistent)"""
+    print("Connecting to ChromaDB...")
+    try:
+        client = chromadb.PersistentClient(path=settings.CHROMA_PATH)
+        print("ChromaDB initialized.")
+        return client
+    except Exception as e:
+        logger.error(f"Error initializing ChromaDB: {e}")
+        raise
+
+# --- 1. STT (Gemini API) ---
+def process_audio(_audio_path, _model_flash):
+    """Gemini API를 사용해 오디오 파일에서 스크립트 추출"""
+    
+    print(f"Uploading audio to Gemini: {_audio_path}...")
+    try:
+        audio_file = genai.upload_file(path=_audio_path)
+    except Exception as e:
+        logger.error(f"오디오 파일 업로드 실패: {e}")
+        return None, None
+
+    print("Transcribing with Gemini Flash...")
+    
+    prompt = [
+        "다음은 강의 오디오 파일입니다. 이 파일을 한국어 텍스트로 변환해 주세요.",
+        audio_file,
+        "다음의 요구사항을 반드시 지켜주세요:",
+        "1. 한국어 스크립트를 작성해 주세요.",
+        "2. 음성 녹음을 빼먹지 말고 변환해 주세요",
+        "3. 스크립트 외의 다른 답변은 하지 말아주세요."
+    ]
+    
+    try:
+        # 타임아웃 10분(600초) 설정 (Pro 모델 사용 시 900초 권장)
+        response = _model_flash.generate_content(prompt, request_options={"timeout": 600})
+        
+        full_script_ts = response.text
+        
+        # 'text_only' 스크립트 생성 (요약 모델 입력용)
+        script_text_only = re.sub(r'\[\d{2}:\d{2}\s*-\s*\d{2}:\d{2}\]\s*', '', full_script_ts)
+        
+        if not script_text_only.strip():
+            script_text_only = full_script_ts
+            
+        print("Gemini transcription complete.")
+        return full_script_ts, script_text_only
+
+    except Exception as e:
+        logger.error(f"Gemini STT 처리 중 오류 발생: {e}")
+        genai.delete_file(audio_file.name)
+        return None, None
+    finally:
+        # STT 작업 완료 후 업로드된 파일 삭제 (오류 여부와 관계없이)
+        try:
+            print(f"Deleting uploaded audio file: {audio_file.name}")
+            genai.delete_file(audio_file.name)
+        except Exception as e:
+            logger.warning(f"Failed to delete uploaded file {audio_file.name}: {e}")
+
+
+# --- 2. PDF 파싱 (PyMuPDF) ---
+def process_pdf(_pdf_path):
+    print(f"Parsing PDF: {_pdf_path}...")
+    try:
+        doc = fitz.open(_pdf_path)
+        pdf_texts = []
+        for page_num, page in enumerate(doc):
+            text = page.get_text("text")
+            if text.strip():
+                pdf_texts.append((page_num + 1, text))
+        print(f"PDF parsing complete. {len(pdf_texts)} pages extracted.")
+        return pdf_texts
+    except Exception as e:
+        logger.error(f"PDF 파싱 중 오류 발생: {e}")
+        return []
+
+# --- 3. 요약 및 구조화 (Gemini Flash) ---
+def get_summary_from_gemini(_model_flash, script_text):
+    print("Generating summary with Gemini Flash...")
+    
+    # script_text가 너무 길면 Gemini 입력 제한에 걸릴 수 있음 (약 32k 토큰)
+    # 여기서는 원본처럼 전체를 보내지만, 실제로는 청크로 나누거나 앞부분을 잘라야 할 수 있음
+    truncated_script = script_text # 예시: 3만자 제한
+    
+    prompt = f"""
+    다음은 대학 강의 스크립트입니다. 이 스크립트의 전체 내용을 파악한 뒤,
+    '소주제(sub-topic)' 단위로 명확하게 나누어 주세요.
+    
+    각 소주제에 대해 다음 정보를 포함하는 JSON 형식으로 출력해 주세요:
+    1. 'topic': 소주제의 핵심 제목 (예: "텐서 병렬 처리의 개념")
+    2. 'summary': 해당 소주제의 내용을 2-3문장으로 요약
+    3. 'original_segment': 해당 소주제가 시작되는 원본 스크립트의 핵심 문장
+
+    [강의 스크립트 시작]
+    {truncated_script}
+    [...중략...]
+    [강의 스크립트 끝]
+
+    JSON 형식 예시:
+    {{
+      "summary_list": [
+        {{
+          "topic": "소주제 제목 1",
+          "summary": "소주제 1의 요약 내용입니다.",
+          "original_segment": "원본 스크립트의 핵심 문장..."
+        }}
+      ]
+    }}
+
+    반드시 유효한 JSON 객체만 응답해 주세요.
+    """
+    
+    try:
+        response = _model_flash.generate_content(prompt)
+        json_str = response.text.strip().lstrip("```json").rstrip("```")
+        summary_data = json.loads(json_str)
+        print("Summary generation complete.")
+        return json.dumps(summary_data, indent=2) # JSON 문자열로 반환
+    except Exception as e:
+        logger.error(f"요약 생성 중 오류 발생: {e}")
+        return None
+
+# --- 4. 임베딩 및 벡터 DB 저장 ---
+def embed_and_store(lecture_id, pdf_texts, script_text, _model_embedding, _chroma_client):
+    print("Starting embedding and storage...")
+    collection_name = f"lecture_{lecture_id}"
+    
+    try:
+        if _chroma_client.get_collection(name=collection_name):
+            _chroma_client.delete_collection(name=collection_name)
+    except Exception:
+        pass # 컬렉션이 없으면 오류 발생, 정상임
+
+    collection = _chroma_client.get_or_create_collection(name=collection_name)
+    
+    documents = []
+    metadatas = []
+    ids = []
+    
+    # PDF 청크 (pdf_texts는 [(page_num, content), ...])
+    for page_num, content in pdf_texts:
+        documents.append(content)
+        metadatas.append({"source": "pdf", "page": page_num, "lecture_id": lecture_id})
+        ids.append(f"pdf_{lecture_id}_{page_num}")
+
+    # 스크립트 청크 (10줄 단위)
+    script_lines = script_text.split('\n')
+    chunk_size = 10
+    for i in range(0, len(script_lines), chunk_size):
+        chunk = "\n".join(script_lines[i:i+chunk_size])
+        if chunk.strip():
+            timestamp = script_lines[i].split(']')[0] + "]" if script_lines[i] else "[00:00]"
+            documents.append(chunk)
+            metadatas.append({"source": "script", "timestamp": timestamp, "lecture_id": lecture_id})
+            ids.append(f"script_{lecture_id}_{i}")
+            
+    # 배치 임베딩 및 저장
+    batch_size = 100 
+    for i in tqdm(range(0, len(documents), batch_size), desc="Embedding Batches"):
+        batch_docs = documents[i:i+batch_size]
+        batch_ids = ids[i:i+batch_size]
+        batch_metadatas = metadatas[i:i+batch_size]
+        
+        try:
+            embeddings = genai.embed_content(
+                model=_model_embedding,
+                content=batch_docs,
+                task_type="retrieval_document"
+            )
+            collection.add(
+                embeddings=embeddings['embedding'],
+                documents=batch_docs,
+                metadatas=batch_metadatas,
+                ids=batch_ids
+            )
+        except Exception as e:
+            logger.error(f"Error during embedding batch {i}: {e}")
+            
+    print("Embedding and storage complete.")
+    # (반환값 없음. ChromaDB에 저장하는 것이 목적)
+
+# --- 5. 의미 기반 자동 매핑 ---
+def create_semantic_mappings(lecture_id, summary_json, _model_embedding, _chroma_client):
+    print("Creating semantic mappings...")
+    mappings_to_create = [] # DB에 저장할 데이터를 리스트로 반환
+    collection_name = f"lecture_{lecture_id}"
+    
+    try:
+        collection = _chroma_client.get_collection(name=collection_name)
+    except Exception as e:
+        logger.error(f"ChromaDB 컬렉션 로드 실패: {e}")
+        return []
+
+    try:
+        summary_data = json.loads(summary_json)
+    except Exception as e:
+        logger.error(f"Summary JSON 파싱 실패: {e}")
+        return []
+
+    for item in tqdm(summary_data.get("summary_list", []), desc="Creating Mappings"):
+        topic = item.get("topic")
+        summary = item.get("summary")
+        if not topic or not summary:
+            continue
+            
+        query_text = f"주제: {topic}\n요약: {summary}"
+        
+        try:
+            query_embedding = genai.embed_content(
+                model=_model_embedding,
+                content=[query_text],
+                task_type="retrieval_query"
+            )['embedding']
+            
+            results = collection.query(
+                query_embeddings=query_embedding,
+                n_results=1,
+                where={"source": "pdf"}
+            )
+            
+            if results["ids"][0]:
+                mapped_doc = results["documents"][0][0]
+                mapped_meta = results["metadatas"][0][0]
+                mapped_page = mapped_meta["page"]
+                
+                # DB에 저장할 딕셔너리를 리스트에 추가
+                mappings_to_create.append({
+                    'lecture_id': lecture_id,
+                    'summary_topic': topic,
+                    'mapped_pdf_page': mapped_page,
+                    'mapped_pdf_content': mapped_doc
+                })
+                
+        except Exception as e:
+            logger.error(f"Error mapping topic '{topic}': {e}")
+            
+    print("Semantic mappings complete.")
+    return mappings_to_create # Celery 태스크가 이 리스트를 받아 DB에 저장
+
+# --- 6. 문맥 기반 Q&A (RAG) ---
+def get_rag_response(lecture_id, query_text, _model_flash, _model_embedding, _chroma_client):
+    print(f"Handling RAG query for lecture {lecture_id}...")
+    collection_name = f"lecture_{lecture_id}"
+    
+    try:
+        collection = _chroma_client.get_collection(name=collection_name)
+    except Exception as e:
+        raise Exception(f"오류: 강의 데이터({lecture_id})에 접근할 수 없습니다. {e}")
+
+    try:
+        query_embedding = genai.embed_content(
+            model=_model_embedding,
+            content=[query_text],
+            task_type="retrieval_query"
+        )['embedding']
+    except Exception as e:
+        raise Exception(f"오류: 질문을 임베딩하는 중 실패했습니다. {e}")
+
+    try:
+        results = collection.query(
+            query_embeddings=query_embedding,
+            n_results=5
+        )
+    except Exception as e:
+        raise Exception(f"오류: 벡터 DB에서 검색 중 실패했습니다. {e}")
+
+    context = ""
+    sources = []
+    if not results["documents"][0]:
+        return "관련된 강의 내용을 찾지 못했습니다."
+
+    for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
+        source_info = f"[출처: PDF {meta['page']}p]" if meta["source"] == "pdf" else f"[출처: 스크립트 {meta['timestamp']}]"
+        context += f"{source_info}\n{doc}\n\n"
+        sources.append(source_info)
+        
+    prompt = f"""
+    당신은 강의 내용을 완벽하게 이해한 AI 조교입니다.
+    다음 '강의 자료'를 바탕으로 사용자의 '질문'에 대해 명확하고 친절하게 답변해 주세요.
+    반드시 제공된 '강의 자료'에 근거하여 답변해야 합니다.
+
+    [강의 자료]
+    {context}
+    [강의 자료 끝]
+
+    [질문]
+    {query_text}
+
+    [답변]
+    """
+    
+    try:
+        response = _model_flash.generate_content(prompt)
+        unique_sources = " (참고: " + ", ".join(sorted(list(set(sources)))) + ")"
+        return response.text + unique_sources
+    except Exception as e:
+        raise Exception(f"오류: Gemini 답변 생성 중 실패했습니다. {e}")
