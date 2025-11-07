@@ -154,18 +154,18 @@ def process_lecture_task(lecture_id):
             # STT 평균 업데이트 (1분당 초)
             if audio_duration_min > 0:
                 stt_sec_per_min = stt_elapsed_sec / audio_duration_min
-                # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존70%, 새 30%)
-                stats.audio_stt_avg_sec_per_min = stats.audio_stt_avg_sec_per_min * 0.7 + stt_sec_per_min * 0.3
+                # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 50%, 새 50%)
+                stats.audio_stt_avg_sec_per_min = stats.audio_stt_avg_sec_per_min * 0.5 + stt_sec_per_min * 0.5
             
             # PDF 처리 평균 업데이트 (1페이지당 초)
             if pdf_page_count > 0:
                 pdf_sec_per_page = pdf_processing_elapsed_sec / pdf_page_count
-                # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 70%, 새 30%)
-                stats.pdf_processing_avg_sec_per_page = stats.pdf_processing_avg_sec_per_page * 0.7 + pdf_sec_per_page * 0.3
+                # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 50%, 새 50%)
+                stats.pdf_processing_avg_sec_per_page = stats.pdf_processing_avg_sec_per_page * 0.5 + pdf_sec_per_page * 0.5
             
             # 요약 평균 업데이트 (고정값)
-            # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 70%, 새 30%)
-            stats.summary_avg_sec = stats.summary_avg_sec * 0.7 + summary_elapsed_sec * 0.3
+            # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 50%, 새 50%)
+            stats.summary_avg_sec = stats.summary_avg_sec * 0.5 + summary_elapsed_sec * 0.5
             
             stats.save()
             print(f"ProcessingStats 업데이트 완료: STT={stats.audio_stt_avg_sec_per_min:.2f}초/분, PDF={stats.pdf_processing_avg_sec_per_page:.2f}초/페이지, 요약={stats.summary_avg_sec:.2f}초")
