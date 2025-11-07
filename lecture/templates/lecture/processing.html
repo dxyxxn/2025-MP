@@ -112,7 +112,7 @@
         
         let lastStep = initialStep;
         
-        // 500ms마다 상태 확인 (더 빠른 업데이트를 위해)
+        // 3초마다 상태 확인
         function checkStatus() {
             fetch(statusUrl + '?t=' + Date.now())  // 캐시 방지
                 .then(response => {
@@ -122,15 +122,7 @@
                     return response.json();
                 })
                 .then(data => {
-                    console.log('[상태 확인]', {
-                        status: data.status,
-                        current_step: data.current_step,
-                        lastStep: lastStep,
-                        timestamp: new Date().toISOString()
-                    }); // 디버깅용
-                    
                     if (data.status === 'completed') {
-                        console.log('[완료] 처리 완료, 페이지 이동');
                         updateProgress(5);
                         setTimeout(() => {
                             window.location.href = detailUrl;
@@ -142,32 +134,18 @@
                         // current_step 업데이트
                         if (data.current_step !== undefined && data.current_step !== null) {
                             const currentStep = parseInt(data.current_step);
-                            console.log('[단계 체크]', {
-                                received: data.current_step,
-                                parsed: currentStep,
-                                lastStep: lastStep,
-                                willUpdate: currentStep !== lastStep && currentStep >= 0 && currentStep <= 5
-                            });
-                            
                             // 단계가 변경되었을 때만 업데이트
                             if (currentStep !== lastStep && currentStep >= 0 && currentStep <= 5) {
-                                console.log('[단계 업데이트]', lastStep, '->', currentStep); // 디버깅용
                                 updateProgress(currentStep);
                                 lastStep = currentStep;
-                            } else if (currentStep === lastStep) {
-                                console.log('[단계 동일]', currentStep, '변경 없음');
-                            } else {
-                                console.warn('[단계 범위 초과]', currentStep);
                             }
-                        } else {
-                            console.warn('[current_step 없음]', data);
                         }
-                        setTimeout(checkStatus, 500); // 500ms마다 확인 (더 빠른 반응)
+                        setTimeout(checkStatus, 3000); // 3초마다 확인
                     }
                 })
                 .catch(error => {
                     console.error('[상태 확인 오류]', error);
-                    setTimeout(checkStatus, 1000); // 오류 시 1초 후 재시도
+                    setTimeout(checkStatus, 1000); // 오류 시 3초 후 재시도
                 });
         }
         

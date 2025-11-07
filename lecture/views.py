@@ -159,15 +159,8 @@ def api_chat_view(request):
 
 # 4. 상태 폴링 API (JavaScript와 통신)
 def api_lecture_status_view(request, lecture_id):
-    # DB에서 최신 데이터를 직접 가져오기 (캐시 무시)
-    # select_for_update를 사용하지 않아도 읽기 전용이므로 일반 get 사용
     lecture = Lecture.objects.get(id=lecture_id)
     current_step = int(lecture.current_step) if lecture.current_step is not None else 0
-    # 디버깅용 로그 (프로덕션에서는 제거)
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.debug(f"[API] lecture_id={lecture_id}, status={lecture.status}, current_step={current_step}")
-    # 명시적으로 current_step을 정수로 변환하여 반환
     return JsonResponse({
         'status': lecture.status, 
         'name': lecture.lecture_name,

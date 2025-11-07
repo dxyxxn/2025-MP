@@ -59,7 +59,9 @@ def process_audio(_audio_path, _model_flash):
         "다음의 요구사항을 반드시 지켜주세요:",
         "1. 한국어 스크립트를 작성해 주세요.",
         "2. 음성 녹음을 빼먹지 말고 변환해 주세요",
-        "3. 스크립트 외의 다른 답변은 하지 말아주세요."
+        "3. 각 문장이나 문단 앞에 해당하는 시간을 [MM:SS] 형식으로 표시해 주세요.",
+        "4. 예시: [00:15] 안녕하세요. 오늘은 ~~에 대해 배워보겠습니다.",
+        "5. 스크립트 외의 다른 답변은 하지 말아주세요."
     ]
     
     try:
@@ -107,12 +109,12 @@ def process_pdf(_pdf_path):
         return []
 
 # --- 3. 요약 및 구조화 (Gemini Flash) ---
-def get_summary_from_gemini(_model_flash, script_text):
+def get_summary_from_gemini(_model_flash, script_text_with_timestamp):
     print("Generating summary with Gemini Flash...")
     
     # script_text가 너무 길면 Gemini 입력 제한에 걸릴 수 있음 (약 32k 토큰)
     # 여기서는 원본처럼 전체를 보내지만, 실제로는 청크로 나누거나 앞부분을 잘라야 할 수 있음
-    truncated_script = script_text # 예시: 3만자 제한
+    truncated_script = script_text_with_timestamp # 예시: 3만자 제한
     
     prompt = f"""
     다음은 대학 강의 스크립트입니다. 이 스크립트의 전체 내용을 파악한 뒤,
@@ -122,6 +124,7 @@ def get_summary_from_gemini(_model_flash, script_text):
     1. 'topic': 소주제의 핵심 제목 (예: "텐서 병렬 처리의 개념")
     2. 'summary': 해당 소주제의 내용을 2-3문장으로 요약
     3. 'original_segment': 해당 소주제가 시작되는 원본 스크립트의 핵심 문장
+    4. 'timestamp': 해당 소주제가 시작되는 시간 (스크립트에서 [MM:SS] 형식으로 표시된 타임스탬프를 찾아서 포함)
 
     [강의 스크립트 시작]
     {truncated_script}
@@ -134,12 +137,14 @@ def get_summary_from_gemini(_model_flash, script_text):
         {{
           "topic": "소주제 제목 1",
           "summary": "소주제 1의 요약 내용입니다.",
-          "original_segment": "원본 스크립트의 핵심 문장..."
+          "original_segment": "원본 스크립트의 핵심 문장...",
+          "timestamp": "[05:30]"
         }}
       ]
     }}
 
     반드시 유효한 JSON 객체만 응답해 주세요.
+    타임스탬프는 스크립트에서 해당 소주제가 시작되는 부분의 [MM:SS] 형식 타임스탬프를 찾아서 포함해 주세요.
     """
     
     try:

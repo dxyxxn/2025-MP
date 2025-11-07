@@ -1,5 +1,4 @@
 from celery import shared_task
-from django.db import transaction
 from .models import Lecture, PdfChunk, Mapping
 from .services import (
     init_gemini_models, init_chromadb_client, 
@@ -20,14 +19,7 @@ def process_lecture_task(lecture_id):
         
         # 1. STT 및 PDF 파싱
         print("1/5: STT 및 PDF 처리 시작...")
-        # select_for_update로 락을 걸고 업데이트하여 즉시 반영 보장
-        with transaction.atomic():
-            lecture = Lecture.objects.select_for_update().get(id=lecture_id)
-            lecture.current_step = 1
-            lecture.save(update_fields=['current_step'])
-        # 업데이트 확인
-        updated_lecture = Lecture.objects.get(id=lecture_id)
-        print(f"[DEBUG] current_step 업데이트 확인: {updated_lecture.current_step}")
+        Lecture.objects.filter(id=lecture_id).update(current_step=1)
         audio_path = lecture.audio_file.path
         pdf_path = lecture.pdf_file.path
         
@@ -43,47 +35,32 @@ def process_lecture_task(lecture_id):
         
         # 2. 요약
         print("2/5: 스크립트 요약 시작...")
-        with transaction.atomic():
-            lecture = Lecture.objects.select_for_update().get(id=lecture_id)
-            lecture.current_step = 2
-            lecture.save(update_fields=['current_step'])
-        updated_lecture = Lecture.objects.get(id=lecture_id)
-        print(f"[DEBUG] current_step 업데이트 확인: {updated_lecture.current_step}")
-        summary_json = get_summary_from_gemini(models['flash'], script_text_only)
+        Lecture.objects.filter(id=lecture_id).update(current_step=2)
+        # 타임스탬프가 포함된 전체 스크립트를 요약 생성에 사용
+        summary_json = get_summary_from_gemini(models['flash'], full_script_ts)
         if summary_json is None:
             raise Exception("요약 생성 실패: 스크립트 요약을 생성할 수 없습니다.")
         print("2/5: 스크립트 요약 완료")
         
         # 3. 임베딩
         print("3/5: 임베딩 및 벡터 DB 저장 시작...")
-        with transaction.atomic():
-            lecture = Lecture.objects.select_for_update().get(id=lecture_id)
-            lecture.current_step = 3
-            lecture.save(update_fields=['current_step'])
-        updated_lecture = Lecture.objects.get(id=lecture_id)
-        print(f"[DEBUG] current_step 업데이트 확인: {updated_lecture.current_step}")
+        Lecture.objects.filter(id=lecture_id).update(current_step=3)
         embed_and_store(lecture.id, pdf_texts, full_script_ts, models['embedding'], chroma_client)
         print("3/5: 임베딩 완료")
 
         # 4. 매핑
         print("4/5: 의미 기반 매핑 시작...")
-        with transaction.atomic():
-            lecture = Lecture.objects.select_for_update().get(id=lecture_id)
-            lecture.current_step = 4
-            lecture.save(update_fields=['current_step'])
-        updated_lecture = Lecture.objects.get(id=lecture_id)
-        print(f"[DEBUG] current_step 업데이트 확인: {updated_lecture.current_step}")
+        Lecture.objects.filter(id=lecture_id).update(current_step=4)
         mappings_to_create = create_semantic_mappings(lecture.id, summary_json, models['embedding'], chroma_client)
         print("4/5: 매핑 완료")
         
         # 5. DB에 결과 저장
-        with transaction.atomic():
-            lecture = Lecture.objects.get(id=lecture_id)
-            lecture.current_step = 5
-            lecture.full_script = full_script_ts
-            lecture.summary_json = summary_json
-            lecture.status = 'completed' # 상태를 '완료'로 변경
-            lecture.save()
+        lecture = Lecture.objects.get(id=lecture_id)
+        lecture.current_step = 5
+        lecture.full_script = full_script_ts
+        lecture.summary_json = summary_json
+        lecture.status = 'completed' # 상태를 '완료'로 변경
+        lecture.save()
 
         # 6. PdfChunk 및 Mapping 모델에도 저장 
         for page_num, content in pdf_texts:
