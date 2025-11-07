@@ -149,3 +149,9 @@ CHROMA_PATH = os.path.join(BASE_DIR, 'chroma_db')
 # 6. Celery 설정 (비동기 작업용)
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
+# 7. 인증 설정
+AUTH_USER_MODEL = 'lecture.CustomUser'  # 커스텀 User 모델 사용
+LOGIN_URL = '/login/'
+LOGIN_REDIRECT_URL = '/'
+LOGOUT_REDIRECT_URL = '/login/'

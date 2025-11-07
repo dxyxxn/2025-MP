@@ -1,18 +1,80 @@
-from django.shortcuts import render
-
-# Create your views here.
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import login, authenticate, logout, get_user_model
+from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.conf import settings
+from django.contrib import messages
 import os
 from .models import Lecture
 from .tasks import process_lecture_task # Celery 태스크 임포트
 from .services import init_gemini_models, init_chromadb_client, get_rag_response
 import json
 
+# 로그인 페이지
+def login_view(request):
+    if request.user.is_authenticated:
+        return redirect('upload')
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        
+        if username and password:
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                return redirect('upload')
+            else:
+                messages.error(request, '아이디 또는 비밀번호가 올바르지 않습니다.')
+        else:
+            messages.error(request, '아이디와 비밀번호를 모두 입력해주세요.')
+    
+    return render(request, 'lecture/login.html')
+
+# 회원가입 페이지
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect('upload')
+    
+    User = get_user_model()
+    
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        password_confirm = request.POST.get('password_confirm')
+        email = request.POST.get('email', '')
+        
+        if not username or not password:
+            messages.error(request, '아이디와 비밀번호를 모두 입력해주세요.')
+        elif password != password_confirm:
+            messages.error(request, '비밀번호가 일치하지 않습니다.')
+        elif User.objects.filter(username=username).exists():
+            messages.error(request, '이미 존재하는 아이디입니다.')
+        else:
+            try:
+                user = User.objects.create_user(
+                    username=username,
+                    password=password,
+                    email=email
+                )
+                login(request, user)
+                messages.success(request, '회원가입이 완료되었습니다.')
+                return redirect('upload')
+            except Exception as e:
+                messages.error(request, f'회원가입 중 오류가 발생했습니다: {str(e)}')
+    
+    return render(request, 'lecture/signup.html')
+
+# 로그아웃
+def logout_view(request):
+    logout(request)
+    messages.success(request, '로그아웃되었습니다.')
+    return redirect('login')
+
 # 1. 업로드 페이지
+@login_required
 def upload_view(request):
     if request.method == 'POST':
         lecture_name = request.POST.get('lecture_name', '').strip()
@@ -28,17 +90,15 @@ def upload_view(request):
                 'error_message': error_message
             })
         
-        # 강의 이름 중복 체크 (앞뒤 공백 제거 후 비교)
-        # DB에 저장된 값도 공백이 포함될 수 있으므로 정규화된 값으로 비교
-        # 정확한 중복 체크를 위해 모든 강의 이름을 정규화하여 비교
-        existing_lectures = Lecture.objects.all()
+        # 강의 이름 중복 체크 (같은 사용자 내에서만)
+        existing_lectures = Lecture.objects.filter(user=request.user)
         for existing in existing_lectures:
             existing_name_normalized = existing.lecture_name.strip() if existing.lecture_name else ""
             input_name_normalized = lecture_name.strip() if lecture_name else ""
             # 빈 문자열이 아닌 경우에만 비교
             if existing_name_normalized and input_name_normalized and existing_name_normalized == input_name_normalized:
                 error_message = f"강의 이름 '{lecture_name}'은(는) 이미 존재합니다. 다른 이름을 사용해주세요."
-                lectures = Lecture.objects.all().order_by('-created_at')
+                lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
                 return render(request, 'lecture/upload.html', {
                     'lectures': lectures,
                     'error_message': error_message
@@ -49,6 +109,7 @@ def upload_view(request):
         try:
             # 1. DB에 파일과 '처리중' 상태 저장
             lecture = Lecture.objects.create(
+                user=request.user,
                 lecture_name=lecture_name,
                 audio_file=audio_file,
                 pdf_file=pdf_file,
@@ -89,7 +150,7 @@ def upload_view(request):
                 # 다른 종류의 IntegrityError
                 error_message = f"데이터베이스 오류가 발생했습니다: {str(e)}"
             
-            lectures = Lecture.objects.all().order_by('-created_at')
+            lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
             return render(request, 'lecture/upload.html', {
                 'lectures': lectures,
                 'error_message': error_message
@@ -97,19 +158,20 @@ def upload_view(request):
         except Exception as e:
             # 기타 예외 처리
             error_message = f"오류가 발생했습니다: {str(e)}"
-            lectures = Lecture.objects.all().order_by('-created_at')
+            lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
             return render(request, 'lecture/upload.html', {
                 'lectures': lectures,
                 'error_message': error_message
             })
 
-    # GET 요청 시: 기존 강의 목록 표시
-    lectures = Lecture.objects.all().order_by('-created_at')
+    # GET 요청 시: 기존 강의 목록 표시 (현재 사용자의 강의만)
+    lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
     return render(request, 'lecture/upload.html', {'lectures': lectures})
 
 # 2. 메인 학습 페이지
+@login_required
 def lecture_detail_view(request, lecture_id):
-    lecture = get_object_or_404(Lecture, id=lecture_id)
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
     
     # 처리 중이면 다른 페이지 표시 (간소화)
     if lecture.status != 'completed':
@@ -141,6 +203,7 @@ def lecture_detail_view(request, lecture_id):
 
 # 3. RAG 챗봇 API (JavaScript와 통신)
 @csrf_exempt # (데모용으로 CSRF 비활성화, 실제론 토큰 사용)
+@login_required
 def api_chat_view(request):
     if request.method == 'POST':
         data = json.loads(request.body)
@@ -148,6 +211,9 @@ def api_chat_view(request):
         query_text = data.get('query_text')
         
         try:
+            # 사용자의 강의인지 확인
+            lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+            
             # 서비스 로직 호출
             models = init_gemini_models()
             chroma_client = init_chromadb_client()
@@ -158,8 +224,9 @@ def api_chat_view(request):
             return JsonResponse({'role': 'assistant', 'content': str(e)}, status=500)
 
 # 4. 상태 폴링 API (JavaScript와 통신)
+@login_required
 def api_lecture_status_view(request, lecture_id):
-    lecture = Lecture.objects.get(id=lecture_id)
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
     current_step = int(lecture.current_step) if lecture.current_step is not None else 0
     return JsonResponse({
         'status': lecture.status, 

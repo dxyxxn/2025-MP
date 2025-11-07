@@ -2,6 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # 인증 관련
+    path('login/', views.login_view, name='login'),
+    path('signup/', views.signup_view, name='signup'),
+    path('logout/', views.logout_view, name='logout'),
+    
     # 1. 업로드 페이지 (Streamlit의 upload_view)
     path('', views.upload_view, name='upload'),
     
