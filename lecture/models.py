@@ -35,6 +35,22 @@ class CustomUser(AbstractUser):
         db_table = 'auth_user'  # 기존 User 테이블과 동일한 이름 사용
 
 class Lecture(models.Model):
+    """
+    강의 모델
+    사용자가 업로드한 강의 음성 파일과 PDF 파일을 저장하고 처리 상태를 관리합니다.
+    
+    컬럼:
+    - id: INTEGER (PK, 자동 생성)
+    - user_id: INTEGER (FK, CustomUser 참조) - 강의를 업로드한 사용자
+    - lecture_name: VARCHAR(255) - 강의 이름
+    - audio_file: VARCHAR(100) - 음성 파일 경로 (MEDIA_ROOT 기준)
+    - pdf_file: VARCHAR(100) - PDF 파일 경로 (MEDIA_ROOT 기준)
+    - full_script: TEXT (NULL 허용) - STT 처리된 전체 스크립트 (타임스탬프 포함)
+    - summary_json: JSON (NULL 허용) - Gemini로 생성된 요약 JSON 데이터
+    - status: VARCHAR(20) - 처리 상태 ('processing': 처리 중, 'completed': 완료, 'failed': 실패)
+    - current_step: INTEGER - 현재 처리 단계 (0~5)
+    - created_at: DATETIME - 강의 생성 일시 (자동 생성)
+    """
     # '처리중', '완료', '실패' 상태를 추적
     STATUS_CHOICES = [
         ('processing', '처리 중'),
@@ -63,6 +79,16 @@ class Lecture(models.Model):
         return f"{self.user.username} - {self.lecture_name}"
 
 class PdfChunk(models.Model):
+    """
+    PDF 청크 모델
+    PDF 파일을 페이지 단위로 분할하여 저장한 데이터입니다.
+    
+    컬럼:
+    - id: INTEGER (PK, 자동 생성)
+    - lecture_id: INTEGER (FK, Lecture 참조) - 해당 강의
+    - page_num: INTEGER - PDF 페이지 번호 (1부터 시작)
+    - content: TEXT - 해당 페이지의 텍스트 내용
+    """
     lecture = models.ForeignKey(Lecture, related_name='chunks', on_delete=models.CASCADE)
     page_num = models.IntegerField()
     content = models.TextField()
@@ -71,6 +97,17 @@ class PdfChunk(models.Model):
         return f"{self.lecture.lecture_name} - Page {self.page_num}"
 
 class Mapping(models.Model):
+    """
+    매핑 모델
+    강의 요약의 각 주제를 PDF의 해당 페이지와 의미 기반으로 매핑한 데이터입니다.
+    
+    컬럼:
+    - id: INTEGER (PK, 자동 생성)
+    - lecture_id: INTEGER (FK, Lecture 참조) - 해당 강의
+    - summary_topic: VARCHAR(500) - 요약에서 추출된 주제/토픽
+    - mapped_pdf_page: INTEGER - 매핑된 PDF 페이지 번호
+    - mapped_pdf_content: TEXT - 매핑된 PDF 페이지의 실제 텍스트 내용
+    """
     lecture = models.ForeignKey(Lecture, related_name='mappings', on_delete=models.CASCADE)
     summary_topic = models.CharField(max_length=500)
     mapped_pdf_page = models.IntegerField()
