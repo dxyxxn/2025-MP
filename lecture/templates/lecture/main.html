@@ -461,7 +461,7 @@
                                 </div>
                                 <div class="card-body">
                                 <div class="script-container">
-                                    <textarea class="form-control" disabled>{{ lecture.full_script }}</textarea>
+                                    <textarea id="script-textarea" class="form-control" disabled>{{ lecture.full_script }}</textarea>
                                 </div>
                             </div>
                             </div>
@@ -542,6 +542,88 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     
     <script>
+        // 스크립트 포맷팅: 각 타임스탬프마다 줄바꿈 추가
+        function formatScriptWithTimestamps(scriptText) {
+            if (!scriptText || scriptText.trim() === '') {
+                return scriptText;
+            }
+            
+            // 타임스탬프 패턴: [MM:SS] 또는 [MM:SS - MM:SS]
+            const timestampPattern = /\[(\d{2}):(\d{2})(?:\s*-\s*(\d{2}):(\d{2}))?\]/g;
+            
+            // 모든 타임스탬프의 위치 찾기
+            const matches = [];
+            let match;
+            while ((match = timestampPattern.exec(scriptText)) !== null) {
+                matches.push({
+                    index: match.index,
+                    text: match[0]
+                });
+            }
+            
+            // 타임스탬프가 없으면 원본 반환
+            if (matches.length === 0) {
+                return scriptText;
+            }
+            
+            // 각 타임스탬프를 기준으로 텍스트 분할하고 줄바꿈 추가
+            let result = '';
+            for (let i = 0; i < matches.length; i++) {
+                const currentMatch = matches[i];
+                const nextIndex = (i < matches.length - 1) ? matches[i + 1].index : scriptText.length;
+                
+                // 현재 타임스탬프부터 다음 타임스탬프 전까지의 텍스트 추출
+                const segment = scriptText.substring(currentMatch.index, nextIndex);
+                
+                // 첫 번째가 아니면 줄바꿈 추가
+                if (i > 0) {
+                    result += '\n';
+                }
+                
+                result += segment;
+            }
+            
+            // 타임스탬프 뒤의 공백을 줄바꿈으로 변경 (가독성 향상)
+            result = result.replace(/\]\s+/g, ']\n');
+            
+            // 연속된 줄바꿈 정리 (최대 2개까지만 허용)
+            result = result.replace(/\n{3,}/g, '\n\n');
+            
+            // 앞뒤 공백 제거
+            result = result.trim();
+            
+            return result;
+        }
+        
+        // 페이지 로드 시 스크립트 포맷팅 적용
+        function applyScriptFormatting() {
+            const scriptTextarea = document.getElementById('script-textarea');
+            if (scriptTextarea) {
+                const originalText = scriptTextarea.value;
+                if (!originalText) return;
+                
+                // 줄바꿈이 거의 없거나 타임스탬프가 연속으로 나오는 경우 포맷팅
+                const lineBreakCount = (originalText.match(/\n/g) || []).length;
+                const timestampCount = (originalText.match(/\[\d{2}:\d{2}\]/g) || []).length;
+                
+                // 줄바꿈이 타임스탬프 개수의 30% 미만이면 포맷팅 적용
+                if (timestampCount > 0 && lineBreakCount < timestampCount * 0.3) {
+                    const formattedText = formatScriptWithTimestamps(originalText);
+                    if (formattedText !== originalText) {
+                        scriptTextarea.value = formattedText;
+                    }
+                }
+            }
+        }
+        
+        // DOMContentLoaded와 window.onload 둘 다 시도
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyScriptFormatting);
+        } else {
+            // DOM이 이미 로드된 경우 즉시 실행
+            applyScriptFormatting();
+        }
+        
         // PDF.js 설정
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
         

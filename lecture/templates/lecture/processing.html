@@ -38,6 +38,11 @@
                                 <h5 class="mb-0">
                                     <span id="progress-text" class="badge bg-primary fs-6">0/5</span>
                                 </h5>
+                                <h5 class="mb-0">
+                                    <span id="estimated-time" class="badge bg-info fs-6">
+                                        <i class="bi bi-clock"></i> 예상 소요 시간: <span id="estimated-time-value">--:--</span>
+                                    </span>
+                                </h5>
                             </div>
                             <div class="progress" style="height: 30px;">
                                 <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%">
@@ -67,6 +72,7 @@
     <div id="status-checker" 
          data-lecture-id="{{ lecture.id }}"
          data-current-step="{{ lecture.current_step }}"
+         data-estimated-time-sec="{{ lecture.estimated_time_sec }}"
          data-status-url="{% url 'api_lecture_status' lecture.id %}"
          data-detail-url="{% url 'lecture_detail' lecture.id %}"
          data-upload-url="{% url 'upload' %}"
@@ -80,9 +86,35 @@
         const checker = document.getElementById('status-checker');
         const lectureId = parseInt(checker.dataset.lectureId);
         const initialStep = parseInt(checker.dataset.currentStep) || 0;
+        const estimatedTimeSec = parseInt(checker.dataset.estimatedTimeSec) || 0;
         const statusUrl = checker.dataset.statusUrl;
         const detailUrl = checker.dataset.detailUrl;
         const uploadUrl = checker.dataset.uploadUrl;
+        
+        // 초를 MM:SS 형식으로 변환하는 함수
+        function formatTime(seconds) {
+            if (seconds <= 0) return '--:--';
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        }
+        
+        // 예상 소요 시간 표시 함수
+        function updateEstimatedTime(seconds) {
+            const estimatedTimeElement = document.getElementById('estimated-time');
+            const estimatedTimeValue = document.getElementById('estimated-time-value');
+            
+            if (seconds > 0) {
+                estimatedTimeValue.textContent = formatTime(seconds);
+                estimatedTimeElement.style.display = '';
+            } else {
+                estimatedTimeValue.textContent = '계산 중...';
+                estimatedTimeElement.style.display = '';
+            }
+        }
+        
+        // 초기 예상 소요 시간 표시
+        updateEstimatedTime(estimatedTimeSec);
         
         // 단계별 설명
         const stepDescriptions = {
@@ -140,6 +172,12 @@
                                 lastStep = currentStep;
                             }
                         }
+                        
+                        // 예상 소요 시간 업데이트 (폴링)
+                        if (data.estimated_time_sec !== undefined && data.estimated_time_sec !== null) {
+                            updateEstimatedTime(data.estimated_time_sec);
+                        }
+                        
                         setTimeout(checkStatus, 3000); // 3초마다 확인
                     }
                 })

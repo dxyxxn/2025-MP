@@ -49,6 +49,8 @@ class Lecture(models.Model):
     - summary_json: JSON (NULL 허용) - Gemini로 생성된 요약 JSON 데이터
     - status: VARCHAR(20) - 처리 상태 ('processing': 처리 중, 'completed': 완료, 'failed': 실패)
     - current_step: INTEGER - 현재 처리 단계 (0~5)
+    - estimated_time_sec: INTEGER - 예상 소요 시간(초). 업로드 시 오디오 길이와 PDF 페이지 수를 기반으로 계산되며, 
+      ProcessingStats의 평균값을 사용하여 예측합니다. 초기값은 0이며, calculate_etr_task에서 비동기로 계산되어 업데이트됩니다.
     - created_at: DATETIME - 강의 생성 일시 (자동 생성)
     """
     # '처리중', '완료', '실패' 상태를 추적
@@ -70,6 +72,9 @@ class Lecture(models.Model):
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='processing')
     current_step = models.IntegerField(default=0, verbose_name="현재 진행 단계")
+    # 예상 소요 시간(초): 오디오 길이와 PDF 페이지 수를 기반으로 ProcessingStats의 평균값을 사용하여 계산
+    # 업로드 시 calculate_etr_task에서 비동기로 계산되어 업데이트됨
+    estimated_time_sec = models.IntegerField(default=0, verbose_name="예상 소요 시간(초)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -112,3 +117,59 @@ class Mapping(models.Model):
     summary_topic = models.CharField(max_length=500)
     mapped_pdf_page = models.IntegerField()
     mapped_pdf_content = models.TextField()
+
+class ProcessingStats(models.Model):
+    """
+    처리 통계 모델
+    각 단계별 평균 처리 속도를 영구적으로 저장하고 업데이트합니다.
+    이 모델은 싱글톤 패턴으로 사용되며(pk=1), 모든 강의 처리 작업이 완료될 때마다 
+    이동 평균 방식(기존 70%, 새 30%)으로 평균값을 업데이트합니다.
+    
+    컬럼:
+    - id: INTEGER (PK, 자동 생성) - 항상 1로 고정 (싱글톤)
+    - audio_stt_avg_sec_per_min: FLOAT - 1분의 오디오를 STT 처리하는 데 걸리는 평균 시간(초)
+      예: 10.0이면 1분 오디오 처리에 평균 10초 소요
+    - pdf_processing_avg_sec_per_page: FLOAT - 1페이지의 PDF를 처리(파싱+임베딩+매핑)하는 데 걸리는 평균 시간(초)
+      예: 2.0이면 1페이지 PDF 처리에 평균 2초 소요
+    - summary_avg_sec: FLOAT - 요약 작업에 걸리는 평균 시간(초)
+      예: 30.0이면 요약 생성에 평균 30초 소요
+    - updated_at: DATETIME - 마지막 업데이트 일시 (자동 업데이트)
+    
+    사용 예시:
+    - ETR 계산: estimated_time_sec = (오디오_길이_분 * audio_stt_avg_sec_per_min) + 
+                (PDF_페이지_수 * pdf_processing_avg_sec_per_page) + summary_avg_sec
+    """
+    # 1분의 오디오를 STT 처리하는 데 걸리는 평균 시간(초)
+    # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
+    audio_stt_avg_sec_per_min = models.FloatField(default=10.0, verbose_name="오디오 STT 평균(초/분)")
+    
+    # 1페이지의 PDF를 처리(파싱+임베딩+매핑)하는 데 걸리는 평균 시간(초)
+    # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
+    pdf_processing_avg_sec_per_page = models.FloatField(default=2.0, verbose_name="PDF 처리 평균(초/페이지)")
+    
+    # 요약 작업에 걸리는 평균 시간(초)
+    # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
+    summary_avg_sec = models.FloatField(default=30.0, verbose_name="요약 평균(초)")
+    
+    updated_at = models.DateTimeField(auto_now=True, verbose_name="업데이트 일시")
+    
+    class Meta:
+        verbose_name = _('처리 통계')
+        verbose_name_plural = _('처리 통계')
+    
+    def __str__(self):
+        return f"ProcessingStats (updated: {self.updated_at})"
+    
+    @classmethod
+    def get_or_create_singleton(cls):
+        """
+        싱글톤 인스턴스를 가져오거나 생성합니다.
+        
+        이 메서드는 pk=1인 ProcessingStats 인스턴스를 반환합니다.
+        존재하지 않으면 기본값으로 새로 생성합니다.
+        
+        Returns:
+            ProcessingStats: pk=1인 싱글톤 인스턴스
+        """
+        obj, created = cls.objects.get_or_create(pk=1)
+        return obj

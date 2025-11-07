@@ -7,8 +7,8 @@ from django.db import IntegrityError
 from django.conf import settings
 from django.contrib import messages
 import os
-from .models import Lecture
-from .tasks import process_lecture_task # Celery 태스크 임포트
+from .models import Lecture, ProcessingStats
+from .tasks import process_lecture_task, calculate_etr_task # Celery 태스크 임포트
 from .services import init_gemini_models, init_chromadb_client, get_rag_response
 import json
 
@@ -113,13 +113,17 @@ def upload_view(request):
                 lecture_name=lecture_name,
                 audio_file=audio_file,
                 pdf_file=pdf_file,
-                status='processing'
+                status='processing',
+                estimated_time_sec=0  # 초기값, 나중에 업데이트됨
             )
             
             # 2. Celery 태스크 호출 (백그라운드 실행)
             process_lecture_task.delay(lecture.id)
             
-            # 3. 처리 중 페이지로 리다이렉트 (사용자가 처리 상태를 볼 수 있도록)
+            # 3. ETR 계산 태스크 호출 (비동기, 빠른 계산)
+            calculate_etr_task.delay(lecture.id)
+            
+            # 4. 처리 중 페이지로 즉시 리다이렉트
             return redirect('lecture_detail', lecture_id=lecture.id)
         except IntegrityError as e:
             # 데이터베이스 레벨에서 중복 체크 (race condition 대비)
@@ -231,5 +235,6 @@ def api_lecture_status_view(request, lecture_id):
     return JsonResponse({
         'status': lecture.status, 
         'name': lecture.lecture_name,
-        'current_step': current_step
+        'current_step': current_step,
+        'estimated_time_sec': lecture.estimated_time_sec
     })
