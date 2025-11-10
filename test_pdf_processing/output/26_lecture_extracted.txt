@@ -1,0 +1,997 @@
+
+================================================================================
+페이지 1
+텍스트 길이: 144자
+================================================================================
+
+=== Text Content ===
+Operating Systems: An Overview
+Prof. Young-Bae Ko
+
+
+=== Image Descriptions ===
+[Image 1]: 1971 is printed on the blue sign.
+
+
+================================================================================
+페이지 2
+텍스트 길이: 760자
+================================================================================
+
+=== Text Content ===
+Remember? … Course Overview
+[Part 1] Learn about core system software consisted of Assemblers, 
+Linkers, and Loaders via “Hypothetical and Simplified Computer 
+Machines”
+– With hands-on experience for assembly programming via SicTools
+Reference: “SicSim: A Simulator of the Educational SIC/XE Computer for a 
+System-Software Course,” Computer Applications in Engineering Education, Vol.
+23(1), January 2015, pp. 137–146. https://doi.org/10.1002/cae.21585
+[Part 2] Learn about basic concepts of Operating Systems like process 
+management and I/O control via Linux
+– With hands-on experience for programming on Linux-based systems
+2
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of a blue and white logo for a company.
+
+
+================================================================================
+페이지 3
+텍스트 길이: 553자
+================================================================================
+
+=== Text Content ===
+References for This Lecture
+• [Textbook] Abraham Silberschatz, Peter Baer Galvin, and Greg Gagne, 
+“Operating System Concepts (10th Edition) – Chapters 1 & 2,” Wiley 
+2019. 
+3
+https://galvin.info/history-of-operating-system-concepts-textbook/
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: 10th edition Operating System Concepts book by Peter R. Salvin, a Dinosaur with open mouth showing teeth and tongue, and a crown on the head.
+[Image 3]: Operating System Concepts: Asia Edition
+
+
+================================================================================
+페이지 4
+텍스트 길이: 673자
+================================================================================
+
+=== Text Content ===
+Contents
+• What is an Operating System (OS)?
+• OS Services and Operations
+• System Calls
+4
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A diagram depicts a system with various components, including user interfaces, system cells, communication, and security.
+[Image 3]: A white circle is at the center of the image, with applications written on it. The circle is surrounded by a larger circle that has system calls written on it. The outermost circle has library routines written on it. There are also words such as kernel and shell written around the circles, providing context to the overall layout.
+
+
+================================================================================
+페이지 5
+텍스트 길이: 571자
+================================================================================
+
+=== Text Content ===
+What is an Operating System?
+• A program that acts as an intermediary between applications and
+computer hardware
+5
+1) Users
+- People, machines, other computers
+- Want to solve computing problems
+2) Programs
+- Solve the computing problems of 
+the users using computer resources
+4) Hardware
+- Provides basic computing resources
+- CPU, memory, I/O devices
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: 10-level deep hierarchy chart showing the relationship between a computer system and its components.
+
+
+================================================================================
+페이지 6
+텍스트 길이: 690자
+================================================================================
+
+=== Text Content ===
+What is an Operating System?
+• A program that acts as an intermediary between applications and
+computer hardware
+6
+1) Users
+- People, machines, other computers
+- Want to solve computing problems
+2) Programs
+- Solve the computing problems of 
+the users using computer resources
+4) Hardware
+- Provides basic computing resources
+- CPU, memory, I/O devices
+3) Operating system (= Manager)
+- Controls and coordinates use of 
+hardware among various 
+applications and users
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 are the years indicated on this logo.
+[Image 2]: 10-level deep hierarchical chart showing the relationship between a computer system and its components.
+
+
+================================================================================
+페이지 7
+텍스트 길이: 470자
+================================================================================
+
+=== Text Content ===
+Goals of Operating Systems
+• Provide an environment in which a user can execute user programs and 
+make solving user problems easier
+• Make the computer system convenient to use
+– Resource abstraction (자원추상화)
+– Resource virtualization (자원가상화)
+• Use computer hardware in an efficient and safe manner
+– Resource sharing (자원공유/스케쥴링)
+– Resource protection (자원보호/격리)
+7
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 8
+텍스트 길이: 562자
+================================================================================
+
+=== Text Content ===
+What Operating Systems Do (1/2)
+• Application/user view
+– Computer users want convenience, ease of use, and good performance
+They don’t care about resource utilization
+– Provides an execution environment for running programs
+– Provides an abstract view of the underlying computer system
+Processors Processes, threads
+Memory Virtual memory address spaces
+Storage Files, directories
+I/O devices Files (ioctls)
+Networks Files (sockets, pipes, …)
+8
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 9
+텍스트 길이: 566자
+================================================================================
+
+=== Text Content ===
+What Operating Systems Do (2/2)
+• System view
+– Deal with many applications and users that compete with each other for 
+resource use
+… and make all of them happy
+– Resource manager
+OS allocates and manages various resources of a computer system
+» CPU, Memory, I/O devices, …
+Decides between conflicting requests for efficient and fair resource use
+– A control program
+OS controls execution of programs to prevent errors and improper use of the 
+computer
+9
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 10
+텍스트 길이: 717자
+================================================================================
+
+=== Text Content ===
+Operating System Services (1/3)
+• OS services provide functions that are helpful to the user:
+1) User interface
+Varies between Command-Line Interface (CLI), Graphics User Interface (GUI), etc.
+2) Program execution
+Load a program into memory and run the program
+End execution, either normally or abnormally (indicating error)
+3) I/O operations
+A running program may require I/O, which may involve a file or an I/O device
+4) File-system manipulation
+Programs need to create, delete, read, and write files and directories
+Search, list file information, permission management, …
+10
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+
+
+================================================================================
+페이지 11
+텍스트 길이: 643자
+================================================================================
+
+=== Text Content ===
+Operating System Services (2/3)
+5) Communications
+Processes may exchange information, on the same computer or between 
+computers over a network
+» Via shared memory or through message passing (packets moved by the OS)
+6) Error detection
+Constantly aware of possible errors
+» May occur in the CPU and memory hardware, in I/O devices, in user program
+» Take an appropriate action to ensure correct and consistent computing
+» Debugging facilities can greatly enhance the user’s and programmer’s abilities to efficiently 
+use the system
+11
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 12
+텍스트 길이: 803자
+================================================================================
+
+=== Text Content ===
+Operating System Services (3/3)
+• Another set of OS functions exists for ensuring the efficient operation of 
+the system itself via resource sharing
+1) Resource allocation
+When multiple users or multiple jobs run concurrently, resources must be 
+allocated to each of them
+Many types of resources - CPU cycles, main memory, file storage, I/O devices
+2) Accounting
+Keep track of which users use how much and what kinds of computer resources
+3) Protection and security
+Protection involves ensuring that all access to system resources is controlled
+Security of the system from outsiders requires user authentication, and extends to 
+defending external I/O devices from invalid access attempts
+12
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 13
+텍스트 길이: 135자
+================================================================================
+
+=== Text Content ===
+13
+How Computer Systems Work
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 14
+텍스트 길이: 484자
+================================================================================
+
+=== Text Content ===
+Computer System Organization
+• A modern general-purpose computer system consists of one or more 
+CPUs and device controllers connected through a common bus 
+providing access to the main memory
+• Concurrent execution of CPUs and devices compete for memory cycles
+14
+Bus
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue and white letters au 1971-1978
+[Image 2]: A diagram depicts a computer setup with a keyboard, mouse, disk controller, and other components.
+
+
+================================================================================
+페이지 15
+텍스트 길이: 539자
+================================================================================
+
+=== Text Content ===
+Computer System Operation
+• Each device controller is in charge of a particular device type
+• Each device controller has a local buffer
+• I/O is data transfer from the I/O device to the controller or vice versa
+• CPU moves data from the controller to the main memory or vice versa
+15
+Bus
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A diagram depicts the inner workings of a computer system, showing the CPU, disks, keyboard, mouse, printer, and graphics controller.
+
+
+================================================================================
+페이지 16
+텍스트 길이: 541자
+================================================================================
+
+=== Text Content ===
+Programmed I/O (a.k.a. polling)
+• CPU repeatedly checks the state of an I/O device through a device 
+controller
+– e.g., whether the requested I/O operation is completed…
+• If its state is ready, CPU directly moves data required for an I/O 
+operation
+• CPU must always be involved in I/O operation handling 
+CPU resource can be used inefficiently
+– CPU may waste substantial time waiting for I/O devices to be ready (busy 
+waiting)
+16
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 17
+텍스트 길이: 651자
+================================================================================
+
+=== Text Content ===
+Interrupt-driven I/O
+• Device controller notifies CPU of events by generating an interrupt
+– When an incoming event occurs in an I/O device
+– Or when a device controller has finished I/O operation
+17
+Bus
+Interrupt
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 are the years indicated on this logo.
+[Image 2]: A diagram shows the components of a computer system. The diagram includes several disks, a mouse, a keyboard, a printer, and a monitor. The central processing unit (CPU) is at the heart of the system, with memory and USB controller connected to it. Graphics adapter and CDs are also part of this well-organized setup.
+
+
+================================================================================
+페이지 18
+텍스트 길이: 787자
+================================================================================
+
+=== Text Content ===
+Interrupt Handling Process
+18
+1. OS preserves the current state of the CPU
+– To come back after handling the interrupt
+– Save registers and the address of the 
+interrupted instruction to the memory
+2. Jumps to a designated interrupt service 
+routine (called interrupt handler)
+– Interrupt vector contains the addresses of 
+all the service routines
+3. Return to the last state by restoring the 
+registers
+Flow of interrupt handling
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+[Image 2]: A white block diagram shows the operation of a system. The top left block says "interrupt." The bottom right block says "service routine." There are several other blocks representing various parts of the system.
+
+
+================================================================================
+페이지 19
+텍스트 길이: 618자
+================================================================================
+
+=== Text Content ===
+Operating System Operations
+19
+Interrupt timeline
+• An operating system is interrupt-driven
+– Hardware interrupt generated by hardware devices (I/O devices)
+Asynchronous event independent on a currently-executing process
+– Software interrupt generated by executing instructions
+Synchronous event always generated by a currently-executing process
+Software error (e.g., division by zero), request for operating system service, etc.
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A chart showing the process of executing a command on a computer.
+
+
+================================================================================
+페이지 20
+텍스트 길이: 443자
+================================================================================
+
+=== Text Content ===
+Interrupt-driven I/O
+• More efficient than programmed I/O
+– Because CPU doesn’t have to do busy waiting
+• However, CPU burden increases when moving a large amount of data
+– CPU can still be used inefficiently
+20
+Bus
+Large 
+data
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A diagram depicts a computer setup with a keyboard, mouse, disk controller, and other components.
+
+
+================================================================================
+페이지 21
+텍스트 길이: 642자
+================================================================================
+
+=== Text Content ===
+Direct Memory Access (DMA) I/O
+• Uses a specific hardware for handling I/O operation
+– called DMA controller
+• CPU requests an I/O operation to DMA controller
+• DMA controller performs data transfer between DC and main memory 
+without CPU intervention
+• DMA controller notifies CPU of I/O operation completion by generating 
+an interrupt
+• Benefits
+– CPU can perform other tasks while an I/O operation is being processed
+– Used for high-speed I/O devices to transmit information at close to memory 
+speeds
+21
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+
+
+================================================================================
+페이지 22
+텍스트 길이: 613자
+================================================================================
+
+=== Text Content ===
+DMA I/O: read operation
+22
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+[Image 2]: 1. CPU: x64 / x64 / x32 / x32 (repeated twice) 
+2. Memory Bus: x8 / x8 (repeated twice) 
+3. I/O Controller: x16 / x16 (repeated twice) 
+4. Disk Controller: x12 / x12 (repeated twice) 
+5. GPU: x12 / x12 (repeated twice) 
+6. Bus to CPU: x8 / x8 (repeated twice) 
+7. Memory controller: x32 / x32 (repeated twice) 
+8. Disk Controller: x12 / x12 (repeated twice) 
+9. I/O Controller: x16 / x16 (repeated twice) 
+10. GPU: x12 / x12 (repeated twice)
+
+
+================================================================================
+페이지 23
+텍스트 길이: 441자
+================================================================================
+
+=== Text Content ===
+DMA I/O: write operation
+23
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: 1. CPU is at the center of the bus. 
+2. Dma controller is next to the cpu. 
+3. A bus with memory buffer is connected to the dma controller. 
+4. The system has a keyboard and monitor. 
+5. There are several cables in the image, including one for the disk controller and another for the memory bus.
+
+
+================================================================================
+페이지 24
+텍스트 길이: 689자
+================================================================================
+
+=== Text Content ===
+Multiprogramming
+• One of the most important aspects of OS is the ability to run multiple 
+programs
+24
+• Multiprogramming needed for efficiency
+– A single program cannot keep either CPU or I/O 
+devices busy at all times
+– Multiprogramming organizes jobs (code and data) so 
+that CPU always has one to execute (= never idle)
+– A subset of total jobs in system is kept in memory
+– One job selected and run via job scheduling
+– When it has to wait for I/O, OS switches to another job
+Memory Layout for 
+Multiprogrammed System
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: 51m is the first job number shown on the system.
+
+
+================================================================================
+페이지 25
+텍스트 길이: 2666자
+================================================================================
+
+=== Text Content ===
+Multitasking
+• Multitasking(= Time-sharing) is a logical extension of multiprogramming
+in which CPU switches jobs frequently so that users can interact with 
+each running job, creating interactive computing
+– If several jobs are ready to run at the same time CPU scheduling
+Each job is given a time slice
+Run a job for a time slice and then switches to the next job
+– Response time should be < 1 second
+25
+Job 6
+Job 1
+Job 3
+Job 2
+Job 4
+Job 5
+10ms (time slice size)
+10ms
+10ms
+10ms
+10ms
+10ms
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: The image displays a computer screen with multiple windows open. There is a long row of windows, each containing different content. Some of the windows have text or diagrams, while others showcase various applications. 
+
+In addition to the windows, there are several captions or labels accompanying them, providing information about the content displayed in each window. The arrangement of the windows and their contents give an impression of a highly informative and organized workspace.
+[Image 3]: A long row of various windows open on a computer screen. Each window displays different content, creating a collage effect. The windows appear to be arranged vertically, showcasing a variety of images and text across the entire display.
+[Image 4]: The image is a collage of various screenshots, primarily showing the lock screen of an Apple computer with many apps displayed. There are multiple instances of the same laptop on different parts of the collage, emphasizing its presence across various sections. 
+
+In addition to the laptop, several other elements can be observed throughout the image. These include a cell phone, a keyboard, and a mouse. There is also a book featured in one part of the collage. The overall composition of the image showcases a tech-focused theme with multiple devices and screens displayed.
+[Image 5]: 5 circles are connected by lines, with each circle labeled with a number. The numbers are 3, 4, 5, 6, and 2. The arrangement of the circles and lines forms a diagram.
+[Image 6]: A checkered pattern fills the background of this image. In the foreground, a diagram is displayed with various boxes connected by lines. The boxes contain user names and numbers, indicating a user's journey through the system. 
+
+There are six boxes in total, with each one labeled with either a number or a name. The first box on the left has a user name of "user 1." The second box is labeled with the number 6 and connects to the third box, which also contains a user name. This pattern continues until the final box on the right is reached.
+
+
+================================================================================
+페이지 26
+텍스트 길이: 114자
+================================================================================
+
+=== Text Content ===
+26
+Systems Calls
+
+
+=== Image Descriptions ===
+[Image 1]: 1971 is the year shown on this logo.
+
+
+================================================================================
+페이지 27
+텍스트 길이: 587자
+================================================================================
+
+=== Text Content ===
+Recap the last session
+• How does a computer operate?
+– Device controllers notify systems of I/O completion with interrupts
+– OS handles the interrupts and restores the system to its last interrupted state
+27
+Interrupt
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A diagram shows the inner workings of a computer system, with various components such as the mouse, keyboard, disk controller, USB controller, graphics adapter, and CPU.
+[Image 3]: A white block diagram with various interrupters and a service router.
+
+
+================================================================================
+페이지 28
+텍스트 길이: 635자
+================================================================================
+
+=== Text Content ===
+Protecting the System
+• How can OS prevent user applications from harming the system?
+– What if an application accesses disk drive directly?
+– What if an application overrides interrupt handlers for keyboard?
+– What if an application executes the HLT instruction?
+28
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue and white letters au 1971-1978
+[Image 2]: The image shows a text document with many lines of text, possibly a log file or a list. The first line reads HT.
+[Image 3]: A description of the top half of a screen displaying information about execution and placement of a processor in a HALT state.
+
+
+================================================================================
+페이지 29
+텍스트 길이: 796자
+================================================================================
+
+=== Text Content ===
+Protecting the System
+• Dual-mode operation: CPU operates in “user mode” or “kernel mode” 
+– Allows OS to protect itself and other system components
+Separate critical things from general things
+– Mode bit (provided by hardware) allows to distinguish on which mode the 
+system is running (0: kernel mode, 1: user mode)
+– All privileged instructions are only executable in the kernel mode
+E.g., HLT in x86
+• Modern CPUs support more than two 
+modes (i.e., multi-mode operations)
+– i.e. virtual machine manager (VMM) 
+mode for guest VMs
+– VMs should be limited to its space for 
+memory access
+Single OS
+OS Virtualization
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue and white letters au 1971-1978
+[Image 2]: a flow chart diagram of processes using a virtual machine.
+
+
+================================================================================
+페이지 30
+텍스트 길이: 598자
+================================================================================
+
+=== Text Content ===
+Privileged Instructions
+• A set of instructions that should be executed carefully
+– Direct I/O access
+E.g., IN/OUT instructions in IA-32
+– Accessing/manipulating system registers
+Control registers
+Interrupt service routine table
+– Memory state management
+Page table updates, page table pointers, TLB loads, etc
+– HLT instruction in IA-32
+• Executable in the kernel mode
+– May generate an exception (fault) if an application tries to run a privileged          
+instruction in user mode
+30
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue and white letters au 1971-1978
+
+
+================================================================================
+페이지 31
+텍스트 길이: 698자
+================================================================================
+
+=== Text Content ===
+Interrupt vs. Exception
+• Exception (= Software interrupt)
+– Generated by executing instructions
+Software error (e.g., division by zero), unauthorized access to data, request for 
+operating system service, …
+– Synchronous
+Happens when CPU executes an instruction
+– Trap(expected, intended) or fault(unexpected)
+– Handled like interrupts
+• C.f., interrupt (= Hardware interrupt)
+– Generated by hardware devices
+– Occurs asynchronously (at any time)
+• Modern OSes are interrupt(including exception)-driven
+– The transition from user mode to kernel mode is done via interrupt or 
+exception
+31
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 32
+텍스트 길이: 526자
+================================================================================
+
+=== Text Content ===
+Transition from User to Kernel Mode (1/2)
+• By interrupt
+– Asynchronous
+– E.g., Timer
+In the kernel mode, OS set a timer to generate an interrupt after some time period 
+(privileged instruction)
+In the user mode, an application process keeps using the CPU
+The timer generates a timer interrupt when the timer expires
+» Switched to the kernel mode
+The OS can make a decision on which process will be executed next
+32
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 blue letters on a white background.
+
+
+================================================================================
+페이지 33
+텍스트 길이: 288자
+================================================================================
+
+=== Text Content ===
+Transition from User to Kernel Mode (2/2)
+• By system call
+– Synchronous
+33
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+[Image 2]: A flow chart diagram with various boxes and arrows connecting them.
+
+
+================================================================================
+페이지 34
+텍스트 길이: 578자
+================================================================================
+
+=== Text Content ===
+System Calls
+• Programming interface to the services provided by the OS
+• Typically written in a high-level language (C/C++)
+• Mostly accessed by programs via a high-level Application Programming 
+Interface (API) rather than direct system call use
+• Most common APIs
+– Win32 API for Windows variants
+– POSIX API for POSIX-based systems
+Virtually include all versions of UNIX, Linux, and Mac OSX
+– Java API for the Java virtual machine (JVM)
+34
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+
+
+================================================================================
+페이지 35
+텍스트 길이: 456자
+================================================================================
+
+=== Text Content ===
+A View of Operating System Services
+35
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+[Image 2]: A flow chart diagram depicting the relationship between several different items. The boxes in the chart represent various processes, and the arrows show the order in which they occur. This diagram is helpful for understanding the workflow within a company or organization.
+
+
+================================================================================
+페이지 36
+텍스트 길이: 472자
+================================================================================
+
+=== Text Content ===
+Types of System Calls
+• Process control
+– create process, terminate process
+– end, abort
+– load, execute
+– get process attributes, set process attributes
+– wait for time
+– wait event, signal event
+– allocate and free memory
+– dump memory if error
+– debugger for determining bugs, single step execution
+– locks for managing access to shared data between processes
+36
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 37
+텍스트 길이: 414자
+================================================================================
+
+=== Text Content ===
+Types of System Calls
+• File management
+– create file, delete file
+– open, close file
+– read, write, reposition
+– get and set file attributes
+• Device management
+– request device, release device
+– read, write, reposition
+– get device attributes, set device attributes
+– logically attach or detach devices
+37
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 38
+텍스트 길이: 518자
+================================================================================
+
+=== Text Content ===
+Types of System Calls
+• Information maintenance
+– get time or date, set time or date
+– get system data, set system data
+– get and set process, file, or device attributes
+• Communications
+– create, delete communication connection
+– send, receive messages (message passing model) 
+– create and gain access to memory regions (shared memory model)
+– transfer status information
+– attach and detach remote devices
+38
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+
+
+================================================================================
+페이지 39
+텍스트 길이: 229자
+================================================================================
+
+=== Text Content ===
+Types of System Calls
+• Protection
+– Control access to resources
+– Get and set permissions
+– Allow and deny user access
+39
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue and white letters au 1971-1978
+
+
+================================================================================
+페이지 40
+텍스트 길이: 293자
+================================================================================
+
+=== Text Content ===
+Example of System Calls
+• System call sequence to copy the contents of one to another file
+40
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A box with many different lines of text that ends with the word destination file.
+
+
+================================================================================
+페이지 41
+텍스트 길이: 280자
+================================================================================
+
+=== Text Content ===
+Windows and UNIX System Calls
+41
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of the blue writing on the white background.
+[Image 2]: A blue screen with a list of files and folders displayed. The top of the list reads "Process control".
+
+
+================================================================================
+페이지 42
+텍스트 길이: 221자
+================================================================================
+
+=== Text Content ===
+Example of POSIX API
+$ man read
+42
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A computer screen with a program that reads from a file description.
+
+
+================================================================================
+페이지 43
+텍스트 길이: 230자
+================================================================================
+
+=== Text Content ===
+Example of POSIX API
+43
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue and white letters au 1971-1978
+[Image 2]: A computer screen displays some text in a window. The text begins with the word success.
+
+
+================================================================================
+페이지 44
+텍스트 길이: 306자
+================================================================================
+
+=== Text Content ===
+Standard C Library Example
+• C program invoking printf() library call, which calls write() system call
+44
+
+
+=== Image Descriptions ===
+[Image 1]: 1973-1978 blue letters on a white background.
+[Image 2]: A flow chart diagram is shown with the user input at the left side of the diagram.
+
+
+================================================================================
+페이지 45
+텍스트 길이: 778자
+================================================================================
+
+=== Text Content ===
+System Call Implementation
+• Typically, each system call is associated 
+with an unique number (system call 
+number)
+– System-call interface maintains a table 
+indexed according to these numbers
+• The system call interface invokes the 
+intended system call in OS kernel and 
+returns status of the system call and any 
+return values
+45
+• The caller needs to know nothing about how the system call is 
+implemented
+– Just needs to obey API and understand what OS will do for system call
+– Most details of OS interface are hidden from programmer by API
+
+
+=== Image Descriptions ===
+[Image 1]: 1971-1973 is the date range of another year that is on the blue sign.
+[Image 2]: A box with the word application on it is connected to a system call interface by a line.
+

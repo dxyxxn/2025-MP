@@ -36,7 +36,7 @@
                         <div class="mb-3">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h5 class="mb-0">
-                                    <span id="progress-text" class="badge bg-primary fs-6">0/5</span>
+                                    <span id="progress-text" class="badge bg-primary fs-6">0/6</span>
                                 </h5>
                                 <h5 class="mb-0">
                                     <span id="estimated-time" class="badge bg-info fs-6">
@@ -49,9 +49,12 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="alert alert-light border mb-3" style="min-height: 50px;">
+                        <div class="alert alert-light border mb-3" style="min-height: 80px;">
                             <p id="step-description" class="mb-0 fw-bold">
                                 초기화 중...
+                            </p>
+                            <p id="step-time" class="mb-0 text-muted small mt-1" style="display: none;">
+                                <i class="bi bi-stopwatch"></i> 소요 시간: <span id="step-time-value">--</span>
                             </p>
                         </div>
                         
@@ -119,24 +122,43 @@
         // 단계별 설명
         const stepDescriptions = {
             0: '초기화 중...',
-            1: 'STT 및 PDF 처리 중...',
-            2: '스크립트 요약 생성 중...',
-            3: '임베딩 및 벡터 DB 저장 중...',
-            4: '의미 기반 매핑 중...',
-            5: '최종 저장 중...'
+            1: 'STT 처리 중...',
+            2: 'PDF 파싱 및 텍스트 추출 중...',
+            3: '스크립트 요약 생성 중...',
+            4: '임베딩 및 벡터 DB 저장 중...',
+            5: '의미 기반 매핑 중...',
+            6: '데이터 저장 중...'
         };
         
+        // 단계별 소요 시간 저장 (서버에서 받아온 값)
+        const stepTimes = {};
+        
         // 진행률 업데이트 함수
-        function updateProgress(currentStep) {
+        function updateProgress(currentStep, stepTime = null) {
             const progressBar = document.getElementById('progress-bar');
             const progressText = document.getElementById('progress-text');
             const stepDescription = document.getElementById('step-description');
-            const percentage = (currentStep / 5) * 100;
+            const stepTimeElement = document.getElementById('step-time');
+            const stepTimeValue = document.getElementById('step-time-value');
+            const percentage = (currentStep / 6) * 100;
             
             progressBar.style.width = percentage + '%';
-            progressText.textContent = currentStep + '/5';
+            progressText.textContent = currentStep + '/6';
             const description = stepDescriptions[currentStep] || '처리 중...';
             stepDescription.innerHTML = description.replace(/\n/g, '<br>');
+            
+            // 소요 시간 표시
+            if (stepTime !== null && stepTime > 0) {
+                stepTimes[currentStep] = stepTime;
+                stepTimeValue.textContent = stepTime.toFixed(2) + '초';
+                stepTimeElement.style.display = 'block';
+            } else if (stepTimes[currentStep]) {
+                // 이전에 저장된 시간이 있으면 표시
+                stepTimeValue.textContent = stepTimes[currentStep].toFixed(2) + '초';
+                stepTimeElement.style.display = 'block';
+            } else {
+                stepTimeElement.style.display = 'none';
+            }
         }
         
         // 초기 진행률 설정
@@ -155,7 +177,7 @@
                 })
                 .then(data => {
                     if (data.status === 'completed') {
-                        updateProgress(5);
+                        updateProgress(6);
                         setTimeout(() => {
                             window.location.href = detailUrl;
                         }, 1000);
@@ -167,8 +189,10 @@
                         if (data.current_step !== undefined && data.current_step !== null) {
                             const currentStep = parseInt(data.current_step);
                             // 단계가 변경되었을 때만 업데이트
-                            if (currentStep !== lastStep && currentStep >= 0 && currentStep <= 5) {
-                                updateProgress(currentStep);
+                            if (currentStep !== lastStep && currentStep >= 0 && currentStep <= 6) {
+                                // 단계별 소요 시간이 있으면 함께 전달
+                                const stepTime = data.step_time || null;
+                                updateProgress(currentStep, stepTime);
                                 lastStep = currentStep;
                             }
                         }

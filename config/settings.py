@@ -155,3 +155,8 @@ AUTH_USER_MODEL = 'lecture.CustomUser'  # 커스텀 User 모델 사용
 LOGIN_URL = '/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/login/'
+
+# 8. Ollama 설정
+OLLAMA_BASE_URL = env('OLLAMA_BASE_URL', default='http://localhost:11434')
+OLLAMA_MODEL = env('OLLAMA_MODEL', default='bakllava')  # bakllava 또는 llava
+OLLAMA_BATCH_SIZE = int(env('OLLAMA_BATCH_SIZE', default='4'))  # 배치 크기 (병렬 처리)

@@ -1,0 +1,277 @@
+{
+  "pdf_path": "/home/rlaehdbs1805/2025MP_2/media_uploads/26_lecture.pdf",
+  "model": "bakllava",
+  "total_pages": 45,
+  "pages": [
+    {
+      "page_num": 1,
+      "text": "=== Text Content ===\nOperating Systems: An Overview\nProf. Young-Bae Ko\n\n\n=== Image Descriptions ===\n[Image 1]: 1971 is printed on the blue sign.",
+      "text_length": 144,
+      "has_text": true
+    },
+    {
+      "page_num": 2,
+      "text": "=== Text Content ===\nRemember? … Course Overview\n[Part 1] Learn about core system software consisted of Assemblers, \nLinkers, and Loaders via “Hypothetical and Simplified Computer \nMachines”\n– With hands-on experience for assembly programming via SicTools\nReference: “SicSim: A Simulator of the Educational SIC/XE Computer for a \nSystem-Software Course,” Computer Applications in Engineering Education, Vol.\n23(1), January 2015, pp. 137–146. https://doi.org/10.1002/cae.21585\n[Part 2] Learn about basic concepts of Operating Systems like process \nmanagement and I/O control via Linux\n– With hands-on experience for programming on Linux-based systems\n2\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of another year on the blue sign.",
+      "text_length": 754,
+      "has_text": true
+    },
+    {
+      "page_num": 3,
+      "text": "=== Text Content ===\nReferences for This Lecture\n• [Textbook] Abraham Silberschatz, Peter Baer Galvin, and Greg Gagne, \n“Operating System Concepts (10th Edition) – Chapters 1 & 2,” Wiley \n2019. \n3\nhttps://galvin.info/history-of-operating-system-concepts-textbook/\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: 10th edition Operating System Concepts book by Peter R. Salvin, a Dinosaur with open mouth showing teeth and tongue, and a crown on top of head.\n[Image 3]: Operating System Concepts (Asia Edition)",
+      "text_length": 557,
+      "has_text": true
+    },
+    {
+      "page_num": 4,
+      "text": "=== Text Content ===\nContents\n• What is an Operating System (OS)?\n• OS Services and Operations\n• System Calls\n4\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A diagram depicting the inner workings of a system with various components is shown. The boxes represent different services, such as user interaction, system calls, communication, and accounting. There are several labels within the diagram, indicating the different aspects of the system. The image provides an overview of how the system operates and is organized.\n[Image 3]: A white circle with a series of applications written on it.",
+      "text_length": 644,
+      "has_text": true
+    },
+    {
+      "page_num": 5,
+      "text": "=== Text Content ===\nWhat is an Operating System?\n• A program that acts as an intermediary between applications and\ncomputer hardware\n5\n1) Users\n- People, machines, other computers\n- Want to solve computing problems\n2) Programs\n- Solve the computing problems of \nthe users using computer resources\n4) Hardware\n- Provides basic computing resources\n- CPU, memory, I/O devices\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue and white letters au 1971-1973\n[Image 2]: 10-pack of user friendly instructions for building a computer system.",
+      "text_length": 540,
+      "has_text": true
+    },
+    {
+      "page_num": 6,
+      "text": "=== Text Content ===\nWhat is an Operating System?\n• A program that acts as an intermediary between applications and\ncomputer hardware\n6\n1) Users\n- People, machines, other computers\n- Want to solve computing problems\n2) Programs\n- Solve the computing problems of \nthe users using computer resources\n4) Hardware\n- Provides basic computing resources\n- CPU, memory, I/O devices\n3) Operating system (= Manager)\n- Controls and coordinates use of \nhardware among various \napplications and users\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: 10-level deep hierarchy chart showing the relationship between a computer hardware component and other components.",
+      "text_length": 699,
+      "has_text": true
+    },
+    {
+      "page_num": 7,
+      "text": "=== Text Content ===\nGoals of Operating Systems\n• Provide an environment in which a user can execute user programs and \nmake solving user problems easier\n• Make the computer system convenient to use\n– Resource abstraction (자원추상화)\n– Resource virtualization (자원가상화)\n• Use computer hardware in an efficient and safe manner\n– Resource sharing (자원공유/스케쥴링)\n– Resource protection (자원보호/격리)\n7\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of another year that is on the blue sign.",
+      "text_length": 494,
+      "has_text": true
+    },
+    {
+      "page_num": 8,
+      "text": "=== Text Content ===\nWhat Operating Systems Do (1/2)\n• Application/user view\n– Computer users want convenience, ease of use, and good performance\nThey don’t care about resource utilization\n– Provides an execution environment for running programs\n– Provides an abstract view of the underlying computer system\nProcessors Processes, threads\nMemory Virtual memory address spaces\nStorage Files, directories\nI/O devices Files (ioctls)\nNetworks Files (sockets, pipes, …)\n8\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue and white letters au 1971-1978",
+      "text_length": 562,
+      "has_text": true
+    },
+    {
+      "page_num": 9,
+      "text": "=== Text Content ===\nWhat Operating Systems Do (2/2)\n• System view\n– Deal with many applications and users that compete with each other for \nresource use\n… and make all of them happy\n– Resource manager\nOS allocates and manages various resources of a computer system\n» CPU, Memory, I/O devices, …\nDecides between conflicting requests for efficient and fair resource use\n– A control program\nOS controls execution of programs to prevent errors and improper use of the \ncomputer\n9\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue writing on the white background.",
+      "text_length": 593,
+      "has_text": true
+    },
+    {
+      "page_num": 10,
+      "text": "=== Text Content ===\nOperating System Services (1/3)\n• OS services provide functions that are helpful to the user:\n1) User interface\nVaries between Command-Line Interface (CLI), Graphics User Interface (GUI), etc.\n2) Program execution\nLoad a program into memory and run the program\nEnd execution, either normally or abnormally (indicating error)\n3) I/O operations\nA running program may require I/O, which may involve a file or an I/O device\n4) File-system manipulation\nPrograms need to create, delete, read, and write files and directories\nSearch, list file information, permission management, …\n10\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 690,
+      "has_text": true
+    },
+    {
+      "page_num": 11,
+      "text": "=== Text Content ===\nOperating System Services (2/3)\n5) Communications\nProcesses may exchange information, on the same computer or between \ncomputers over a network\n» Via shared memory or through message passing (packets moved by the OS)\n6) Error detection\nConstantly aware of possible errors\n» May occur in the CPU and memory hardware, in I/O devices, in user program\n» Take an appropriate action to ensure correct and consistent computing\n» Debugging facilities can greatly enhance the user’s and programmer’s abilities to efficiently \nuse the system\n11\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 643,
+      "has_text": true
+    },
+    {
+      "page_num": 12,
+      "text": "=== Text Content ===\nOperating System Services (3/3)\n• Another set of OS functions exists for ensuring the efficient operation of \nthe system itself via resource sharing\n1) Resource allocation\nWhen multiple users or multiple jobs run concurrently, resources must be \nallocated to each of them\nMany types of resources - CPU cycles, main memory, file storage, I/O devices\n2) Accounting\nKeep track of which users use how much and what kinds of computer resources\n3) Protection and security\nProtection involves ensuring that all access to system resources is controlled\nSecurity of the system from outsiders requires user authentication, and extends to \ndefending external I/O devices from invalid access attempts\n12\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 803,
+      "has_text": true
+    },
+    {
+      "page_num": 13,
+      "text": "=== Text Content ===\n13\nHow Computer Systems Work\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 135,
+      "has_text": true
+    },
+    {
+      "page_num": 14,
+      "text": "=== Text Content ===\nComputer System Organization\n• A modern general-purpose computer system consists of one or more \nCPUs and device controllers connected through a common bus \nproviding access to the main memory\n• Concurrent execution of CPUs and devices compete for memory cycles\n14\nBus\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A diagram depicts the inner workings of a computer system, showing various components such as the keyboard, mouse, disk controller, and graphics controller. The memory is located at the center of the diagram, with all other components connected to it. The image provides a clear visual representation of how the different parts of a computer system are interconnected and function together.",
+      "text_length": 777,
+      "has_text": true
+    },
+    {
+      "page_num": 15,
+      "text": "=== Text Content ===\nComputer System Operation\n• Each device controller is in charge of a particular device type\n• Each device controller has a local buffer\n• I/O is data transfer from the I/O device to the controller or vice versa\n• CPU moves data from the controller to the main memory or vice versa\n15\nBus\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A diagram shows the components of a computer system, including the CPU, memory, keyboard, mouse, disk controller, and graphics adapter.",
+      "text_length": 541,
+      "has_text": true
+    },
+    {
+      "page_num": 16,
+      "text": "=== Text Content ===\nProgrammed I/O (a.k.a. polling)\n• CPU repeatedly checks the state of an I/O device through a device \ncontroller\n– e.g., whether the requested I/O operation is completed…\n• If its state is ready, CPU directly moves data required for an I/O \noperation\n• CPU must always be involved in I/O operation handling \nCPU resource can be used inefficiently\n– CPU may waste substantial time waiting for I/O devices to be ready (busy \nwaiting)\n16\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 541,
+      "has_text": true
+    },
+    {
+      "page_num": 17,
+      "text": "=== Text Content ===\nInterrupt-driven I/O\n• Device controller notifies CPU of events by generating an interrupt\n– When an incoming event occurs in an I/O device\n– Or when a device controller has finished I/O operation\n17\nBus\nInterrupt\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of another year on the blue sign.\n[Image 2]: A diagram shows the components of a computer system, including the CPU, memory, disk controller, keyboard, mouse, printer, and monitor.",
+      "text_length": 483,
+      "has_text": true
+    },
+    {
+      "page_num": 18,
+      "text": "=== Text Content ===\nInterrupt Handling Process\n18\n1. OS preserves the current state of the CPU\n– To come back after handling the interrupt\n– Save registers and the address of the \ninterrupted instruction to the memory\n2. Jumps to a designated interrupt service \nroutine (called interrupt handler)\n– Interrupt vector contains the addresses of \nall the service routines\n3. Return to the last state by restoring the \nregisters\nFlow of interrupt handling\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A white block diagram shows a program that is executed on a computer. The diagram depicts the main function of the program, which is located at the center-left of the image. It also shows various other functions that are part of the program. \nInterrupts and execution flow are indicated within the diagram. There are two interrupts, one towards the left side and another on the right side. The execution flow is shown by arrows connecting the different functions. \nThe top-right corner of the image features a small circle that is part of the program's diagram.",
+      "text_length": 1110,
+      "has_text": true
+    },
+    {
+      "page_num": 19,
+      "text": "=== Text Content ===\nOperating System Operations\n19\nInterrupt timeline\n• An operating system is interrupt-driven\n– Hardware interrupt generated by hardware devices (I/O devices)\nAsynchronous event independent on a currently-executing process\n– Software interrupt generated by executing instructions\nSynchronous event always generated by a currently-executing process\nSoftware error (e.g., division by zero), request for operating system service, etc.\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A chart showing the process of executing a command on a computer.",
+      "text_length": 618,
+      "has_text": true
+    },
+    {
+      "page_num": 20,
+      "text": "=== Text Content ===\nInterrupt-driven I/O\n• More efficient than programmed I/O\n– Because CPU doesn’t have to do busy waiting\n• However, CPU burden increases when moving a large amount of data\n– CPU can still be used inefficiently\n20\nBus\nLarge \ndata\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A diagram shows the components of a computer system. The diagram is very detailed, showing the memory, USB controller, disk drive, keyboard, mouse, printer, and monitor. The memory is located at the bottom left of the diagram. The USB controller is positioned just above the memory, with the disk drive adjacent to it. The keyboard is placed next to the disk drive, while the mouse is situated above the keyboard. The printer and monitor are positioned at the top right of the diagram.",
+      "text_length": 831,
+      "has_text": true
+    },
+    {
+      "page_num": 21,
+      "text": "=== Text Content ===\nDirect Memory Access (DMA) I/O\n• Uses a specific hardware for handling I/O operation\n– called DMA controller\n• CPU requests an I/O operation to DMA controller\n• DMA controller performs data transfer between DC and main memory \nwithout CPU intervention\n• DMA controller notifies CPU of I/O operation completion by generating \nan interrupt\n• Benefits\n– CPU can perform other tasks while an I/O operation is being processed\n– Used for high-speed I/O devices to transmit information at close to memory \nspeeds\n21\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 615,
+      "has_text": true
+    },
+    {
+      "page_num": 22,
+      "text": "=== Text Content ===\nDMA I/O: read operation\n22\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue writing on the white background.\n[Image 2]: 1. CPU: x64 / x32 / x64 / x32 (repeated twice) \n2. Memory Bus: x64 / x32 (repeated twice) \n3. I/O Bus: x64 / x32 (repeated twice) \n4. GPU: x64 / x32 (repeated twice) \n5. Disk Controller: x64 / x32 (repeated twice) \n6. Dma: x64 / x32 (repeated twice) \n7. Bus: x64 / x32 (reped twice) \n8. Bus: x64 / x32 (repeated twice)",
+      "text_length": 490,
+      "has_text": true
+    },
+    {
+      "page_num": 23,
+      "text": "=== Text Content ===\nDMA I/O: write operation\n23\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: 1. CPU is at the center of the bus. \n2. Dma controller is next to the cpu. \n3. A bus with memory buffer is connected to the dma controller. \n4. The South Korea language is used.",
+      "text_length": 323,
+      "has_text": true
+    },
+    {
+      "page_num": 24,
+      "text": "=== Text Content ===\nMultiprogramming\n• One of the most important aspects of OS is the ability to run multiple \nprograms\n24\n• Multiprogramming needed for efficiency\n– A single program cannot keep either CPU or I/O \ndevices busy at all times\n– Multiprogramming organizes jobs (code and data) so \nthat CPU always has one to execute (= never idle)\n– A subset of total jobs in system is kept in memory\n– One job selected and run via job scheduling\n– When it has to wait for I/O, OS switches to another job\nMemory Layout for \nMultiprogrammed System\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: 51m is the label of the first row of the operating system.",
+      "text_length": 699,
+      "has_text": true
+    },
+    {
+      "page_num": 25,
+      "text": "=== Text Content ===\nMultitasking\n• Multitasking(= Time-sharing) is a logical extension of multiprogramming\nin which CPU switches jobs frequently so that users can interact with \neach running job, creating interactive computing\n– If several jobs are ready to run at the same time CPU scheduling\nEach job is given a time slice\nRun a job for a time slice and then switches to the next job\n– Response time should be < 1 second\n25\nJob 6\nJob 1\nJob 3\nJob 2\nJob 4\nJob 5\n10ms (time slice size)\n10ms\n10ms\n10ms\n10ms\n10ms\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue writing on the white background.\n[Image 2]: The image shows a computer screen with multiple windows open. There is a long row of windows next to each other, displaying various content. Some of the windows are titled \"Outlook Web App.\" \n\nIn addition to the many windows, there is a large image of a mountain range on the left side of the screen. The screen appears to be from a laptop computer, as the windows are arranged in a linear fashion, filling up the entire display area.\n[Image 3]: A long row of various windows open on a computer screen.\n[Image 4]: The image is a collage of various screenshots, primarily showing the lock screen of an Apple computer with many apps displayed. There are multiple instances of the same laptop on different parts of the collage, emphasizing the focus on the device's home screen. \n\nIn addition to the laptop, there are several cell phones scattered throughout the image, showcasing various wallpapers and home screens. The arrangement of these devices gives a sense of the evolving design of electronic personal organizers over time.\n[Image 5]: 5 circles are connected by lines, with each circle labeled with a number. The numbers are 3, 4, 5, 6, and 2. The arrangement of the circles and lines forms a diagram.\n[Image 6]: A checkered box with blue and white arrows inside of it.",
+      "text_length": 1913,
+      "has_text": true
+    },
+    {
+      "page_num": 26,
+      "text": "=== Text Content ===\n26\nSystems Calls\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 are the years indicated on this logo.",
+      "text_length": 125,
+      "has_text": true
+    },
+    {
+      "page_num": 27,
+      "text": "=== Text Content ===\nRecap the last session\n• How does a computer operate?\n– Device controllers notify systems of I/O completion with interrupts\n– OS handles the interrupts and restores the system to its last interrupted state\n27\nInterrupt\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A diagram shows the inner workings of a computer system, with various components such as the mouse, keyboard, disk controller, USB controller, graphics adapter, and CPU.\n[Image 3]: A white block diagram shows the operation of a system. The top left block says \"interrupt.\" The bottom right block has \"service routine\" next to a \"run\" symbol. There are several other blocks with arrows connecting them, showing the flow of execution within the system.",
+      "text_length": 787,
+      "has_text": true
+    },
+    {
+      "page_num": 28,
+      "text": "=== Text Content ===\nProtecting the System\n• How can OS prevent user applications from harming the system?\n– What if an application accesses disk drive directly?\n– What if an application overrides interrupt handlers for keyboard?\n– What if an application executes the HLT instruction?\n28\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: The image shows a text document with many lines of text. The first line reads HTM/L, and the second line starts with the word INSTRUCTION. There are several other lines of text that follow, making up the body of the document.\n[Image 3]: A description of the top half of a screen displaying information about execution and placement of a processor in a HALT state.",
+      "text_length": 748,
+      "has_text": true
+    },
+    {
+      "page_num": 29,
+      "text": "=== Text Content ===\nProtecting the System\n• Dual-mode operation: CPU operates in “user mode” or “kernel mode” \n– Allows OS to protect itself and other system components\nSeparate critical things from general things\n– Mode bit (provided by hardware) allows to distinguish on which mode the \nsystem is running (0: kernel mode, 1: user mode)\n– All privileged instructions are only executable in the kernel mode\nE.g., HLT in x86\n• Modern CPUs support more than two \nmodes (i.e., multi-mode operations)\n– i.e. virtual machine manager (VMM) \nmode for guest VMs\n– VMs should be limited to its space for \nmemory access\nSingle OS\nOS Virtualization\n\n\n=== Image Descriptions ===\n[Image 1]: 1971 is the year shown on this logo.\n[Image 2]: a flow chart diagram of processes using a virtual machine.",
+      "text_length": 787,
+      "has_text": true
+    },
+    {
+      "page_num": 30,
+      "text": "=== Text Content ===\nPrivileged Instructions\n• A set of instructions that should be executed carefully\n– Direct I/O access\nE.g., IN/OUT instructions in IA-32\n– Accessing/manipulating system registers\nControl registers\nInterrupt service routine table\n– Memory state management\nPage table updates, page table pointers, TLB loads, etc\n– HLT instruction in IA-32\n• Executable in the kernel mode\n– May generate an exception (fault) if an application tries to run a privileged          \ninstruction in user mode\n30\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue and white letters au 1971-1978",
+      "text_length": 598,
+      "has_text": true
+    },
+    {
+      "page_num": 31,
+      "text": "=== Text Content ===\nInterrupt vs. Exception\n• Exception (= Software interrupt)\n– Generated by executing instructions\nSoftware error (e.g., division by zero), unauthorized access to data, request for \noperating system service, …\n– Synchronous\nHappens when CPU executes an instruction\n– Trap(expected, intended) or fault(unexpected)\n– Handled like interrupts\n• C.f., interrupt (= Hardware interrupt)\n– Generated by hardware devices\n– Occurs asynchronously (at any time)\n• Modern OSes are interrupt(including exception)-driven\n– The transition from user mode to kernel mode is done via interrupt or \nexception\n31\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 698,
+      "has_text": true
+    },
+    {
+      "page_num": 32,
+      "text": "=== Text Content ===\nTransition from User to Kernel Mode (1/2)\n• By interrupt\n– Asynchronous\n– E.g., Timer\nIn the kernel mode, OS set a timer to generate an interrupt after some time period \n(privileged instruction)\nIn the user mode, an application process keeps using the CPU\nThe timer generates a timer interrupt when the timer expires\n» Switched to the kernel mode\nThe OS can make a decision on which process will be executed next\n32\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 526,
+      "has_text": true
+    },
+    {
+      "page_num": 33,
+      "text": "=== Text Content ===\nTransition from User to Kernel Mode (2/2)\n• By system call\n– Synchronous\n33\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue writing on the white background.\n[Image 2]: A flow chart diagram with various boxes and arrows connecting them.",
+      "text_length": 288,
+      "has_text": true
+    },
+    {
+      "page_num": 34,
+      "text": "=== Text Content ===\nSystem Calls\n• Programming interface to the services provided by the OS\n• Typically written in a high-level language (C/C++)\n• Mostly accessed by programs via a high-level Application Programming \nInterface (API) rather than direct system call use\n• Most common APIs\n– Win32 API for Windows variants\n– POSIX API for POSIX-based systems\nVirtually include all versions of UNIX, Linux, and Mac OSX\n– Java API for the Java virtual machine (JVM)\n34\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue and white letters au 1971-1973",
+      "text_length": 551,
+      "has_text": true
+    },
+    {
+      "page_num": 35,
+      "text": "=== Text Content ===\nA View of Operating System Services\n35\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A chart is displayed with various boxes labeled with different terms. The top left box says \"user\" and the top center box says \"server\". There are several other boxes that describe different aspects of a system, such as \"communication\", \"hardware\", \"software\", \"security\", and \"installation\". The chart provides an overview of the various components involved in a system, from the user's perspective to the server and beyond.",
+      "text_length": 582,
+      "has_text": true
+    },
+    {
+      "page_num": 36,
+      "text": "=== Text Content ===\nTypes of System Calls\n• Process control\n– create process, terminate process\n– end, abort\n– load, execute\n– get process attributes, set process attributes\n– wait for time\n– wait event, signal event\n– allocate and free memory\n– dump memory if error\n– debugger for determining bugs, single step execution\n– locks for managing access to shared data between processes\n36\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 472,
+      "has_text": true
+    },
+    {
+      "page_num": 37,
+      "text": "=== Text Content ===\nTypes of System Calls\n• File management\n– create file, delete file\n– open, close file\n– read, write, reposition\n– get and set file attributes\n• Device management\n– request device, release device\n– read, write, reposition\n– get device attributes, set device attributes\n– logically attach or detach devices\n37\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue writing on the white background.",
+      "text_length": 441,
+      "has_text": true
+    },
+    {
+      "page_num": 38,
+      "text": "=== Text Content ===\nTypes of System Calls\n• Information maintenance\n– get time or date, set time or date\n– get system data, set system data\n– get and set process, file, or device attributes\n• Communications\n– create, delete communication connection\n– send, receive messages (message passing model) \n– create and gain access to memory regions (shared memory model)\n– transfer status information\n– attach and detach remote devices\n38\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 518,
+      "has_text": true
+    },
+    {
+      "page_num": 39,
+      "text": "=== Text Content ===\nTypes of System Calls\n• Protection\n– Control access to resources\n– Get and set permissions\n– Allow and deny user access\n39\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.",
+      "text_length": 229,
+      "has_text": true
+    },
+    {
+      "page_num": 40,
+      "text": "=== Text Content ===\nExample of System Calls\n• System call sequence to copy the contents of one to another file\n40\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue writing on the white background.\n[Image 2]: A box with many different lines of text that ends with the word destination file.",
+      "text_length": 320,
+      "has_text": true
+    },
+    {
+      "page_num": 41,
+      "text": "=== Text Content ===\nWindows and UNIX System Calls\n41\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A blue screen with white words that describe different computer files and their functions.",
+      "text_length": 241,
+      "has_text": true
+    },
+    {
+      "page_num": 42,
+      "text": "=== Text Content ===\nExample of POSIX API\n$ man read\n42\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A computer screen with a program that reads from a file description.",
+      "text_length": 221,
+      "has_text": true
+    },
+    {
+      "page_num": 43,
+      "text": "=== Text Content ===\nExample of POSIX API\n43\n\n\n=== Image Descriptions ===\n[Image 1]: 1973-1978 blue letters on a white background.\n[Image 2]: A computer screen with a large amount of text displayed. The text is mostly English, but there is one non-English word \"por favor\" near the top left. The screen appears to be from a Microsoft Windows application, as indicated by the presence of error messages and success messages.",
+      "text_length": 423,
+      "has_text": true
+    },
+    {
+      "page_num": 44,
+      "text": "=== Text Content ===\nStandard C Library Example\n• C program invoking printf() library call, which calls write() system call\n44\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of another year on the blue sign.\n[Image 2]: A flow chart diagram is shown with the initial step being user mode.",
+      "text_length": 308,
+      "has_text": true
+    },
+    {
+      "page_num": 45,
+      "text": "=== Text Content ===\nSystem Call Implementation\n• Typically, each system call is associated \nwith an unique number (system call \nnumber)\n– System-call interface maintains a table \nindexed according to these numbers\n• The system call interface invokes the \nintended system call in OS kernel and \nreturns status of the system call and any \nreturn values\n45\n• The caller needs to know nothing about how the system call is \nimplemented\n– Just needs to obey API and understand what OS will do for system call\n– Most details of OS interface are hidden from programmer by API\n\n\n=== Image Descriptions ===\n[Image 1]: 1971-1973 is the date range of the blue letters spelling out au.\n[Image 2]: A diagram shows a system call interface with a flow chart.",
+      "text_length": 743,
+      "has_text": true
+    }
+  ]
+}

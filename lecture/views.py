@@ -232,9 +232,16 @@ def api_chat_view(request):
 def api_lecture_status_view(request, lecture_id):
     lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
     current_step = int(lecture.current_step) if lecture.current_step is not None else 0
+    
+    # 현재 단계의 소요 시간 가져오기
+    step_time = None
+    if lecture.step_times and str(current_step) in lecture.step_times:
+        step_time = lecture.step_times[str(current_step)]
+    
     return JsonResponse({
         'status': lecture.status, 
         'name': lecture.lecture_name,
         'current_step': current_step,
-        'estimated_time_sec': lecture.estimated_time_sec
+        'estimated_time_sec': lecture.estimated_time_sec,
+        'step_time': step_time  # 현재 단계의 소요 시간
     })

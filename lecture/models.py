@@ -75,6 +75,8 @@ class Lecture(models.Model):
     # 예상 소요 시간(초): 오디오 길이와 PDF 페이지 수를 기반으로 ProcessingStats의 평균값을 사용하여 계산
     # 업로드 시 calculate_etr_task에서 비동기로 계산되어 업데이트됨
     estimated_time_sec = models.IntegerField(default=0, verbose_name="예상 소요 시간(초)")
+    # 단계별 소요 시간(초) - JSON 형식: {"1": 10.5, "2": 25.3, ...}
+    step_times = models.JSONField(default=dict, blank=True, verbose_name="단계별 소요 시간")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

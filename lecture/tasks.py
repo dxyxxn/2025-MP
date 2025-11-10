@@ -1,8 +1,8 @@
 from celery import shared_task
 from .models import Lecture, PdfChunk, Mapping, ProcessingStats
 from .services import (
-    init_gemini_models, init_chromadb_client, 
-    process_audio, process_pdf, get_summary_from_gemini,
+    init_gemini_models, init_chromadb_client, init_ollama_client,
+    process_audio, process_pdf, get_pdf_page_count, get_summary_from_gemini,
     embed_and_store, create_semantic_mappings
 )
 import time
@@ -56,6 +56,7 @@ def process_lecture_task(lecture_id):
         lecture = Lecture.objects.get(id=lecture_id)
         models = init_gemini_models()
         chroma_client = init_chromadb_client()
+        ollama_client = init_ollama_client()
 
         # Streamlit의 upload_view 로직을 그대로 가져옴
         start_time = time.time()
@@ -71,8 +72,11 @@ def process_lecture_task(lecture_id):
             print(f"오디오 길이 계산 실패: {e}")
             audio_duration_min = 0
         
-        # 1. STT 및 PDF 파싱
-        print("1/5: STT 및 PDF 처리 시작...")
+        # 단계별 소요 시간 저장용 딕셔너리
+        step_times = {}
+        
+        # 1. STT
+        print("1/6: STT 처리 시작...")
         Lecture.objects.filter(id=lecture_id).update(current_step=1)
         
         # STT 시간 측정 (오디오 길이 기반 평균 계산용)
@@ -81,20 +85,27 @@ def process_lecture_task(lecture_id):
         if full_script_ts is None or script_text_only is None:
             raise Exception("STT 처리 실패: 오디오 파일을 텍스트로 변환할 수 없습니다.")
         stt_elapsed_sec = time.time() - stt_start_time
+        step_times['1'] = stt_elapsed_sec
+        Lecture.objects.filter(id=lecture_id).update(step_times=step_times)
+        print(f"1/6: STT 처리 완료 (소요 시간: {stt_elapsed_sec:.2f}초)")
         
-        # PDF 파싱 시간 측정 (PDF 처리 평균 계산용)
+        # 2. PDF 파싱 및 텍스트 추출
+        print("2/6: PDF 파싱 및 텍스트 추출 시작...")
+        Lecture.objects.filter(id=lecture_id).update(current_step=2)
         pdf_parse_start_time = time.time()
-        pdf_texts = process_pdf(pdf_path)
+        
+        pdf_texts = process_pdf(pdf_path, ollama_client=ollama_client)
         if not pdf_texts:
             raise Exception("PDF 파싱 실패: PDF 파일을 읽을 수 없습니다.")
         pdf_parse_elapsed_sec = time.time() - pdf_parse_start_time
         pdf_page_count = len(pdf_texts) if pdf_texts else 0
+        step_times['2'] = pdf_parse_elapsed_sec
+        Lecture.objects.filter(id=lecture_id).update(step_times=step_times)
+        print(f"2/6: PDF 파싱 및 텍스트 추출 완료 (소요 시간: {pdf_parse_elapsed_sec:.2f}초)")
         
-        print("1/5: STT 및 PDF 처리 완료")
-        
-        # 2. 요약
-        print("2/5: 스크립트 요약 시작...")
-        Lecture.objects.filter(id=lecture_id).update(current_step=2)
+        # 3. 스크립트 요약
+        print("3/6: 스크립트 요약 시작...")
+        Lecture.objects.filter(id=lecture_id).update(current_step=3)
         summary_start_time = time.time()
         
         # 타임스탬프가 포함된 전체 스크립트를 요약 생성에 사용
@@ -103,40 +114,49 @@ def process_lecture_task(lecture_id):
             raise Exception("요약 생성 실패: 스크립트 요약을 생성할 수 없습니다.")
         
         summary_elapsed_sec = time.time() - summary_start_time
-        print("2/5: 스크립트 요약 완료")
+        step_times['3'] = summary_elapsed_sec
+        Lecture.objects.filter(id=lecture_id).update(step_times=step_times)
+        print(f"3/6: 스크립트 요약 완료 (소요 시간: {summary_elapsed_sec:.2f}초)")
         
-        # 3. 임베딩
-        print("3/5: 임베딩 및 벡터 DB 저장 시작...")
-        Lecture.objects.filter(id=lecture_id).update(current_step=3)
+        # 4. 임베딩
+        print("4/6: 임베딩 및 벡터 DB 저장 시작...")
+        Lecture.objects.filter(id=lecture_id).update(current_step=4)
         embed_start_time = time.time()
         
         embed_and_store(lecture.id, pdf_texts, full_script_ts, models['embedding'], chroma_client)
         
         embed_elapsed_sec = time.time() - embed_start_time
-        print("3/5: 임베딩 완료")
+        step_times['4'] = embed_elapsed_sec
+        Lecture.objects.filter(id=lecture_id).update(step_times=step_times)
+        print(f"4/6: 임베딩 완료 (소요 시간: {embed_elapsed_sec:.2f}초)")
 
-        # 4. 매핑
-        print("4/5: 의미 기반 매핑 시작...")
-        Lecture.objects.filter(id=lecture_id).update(current_step=4)
+        # 5. 매핑
+        print("5/6: 의미 기반 매핑 시작...")
+        Lecture.objects.filter(id=lecture_id).update(current_step=5)
         mapping_start_time = time.time()
         
         mappings_to_create = create_semantic_mappings(lecture.id, summary_json, models['embedding'], chroma_client)
         
         mapping_elapsed_sec = time.time() - mapping_start_time
-        print("4/5: 매핑 완료")
+        step_times['5'] = mapping_elapsed_sec
+        Lecture.objects.filter(id=lecture_id).update(step_times=step_times)
+        print(f"5/6: 매핑 완료 (소요 시간: {mapping_elapsed_sec:.2f}초)")
         
         # PDF 처리 시간 = 파싱 + 임베딩 + 매핑
         pdf_processing_elapsed_sec = pdf_parse_elapsed_sec + embed_elapsed_sec + mapping_elapsed_sec
         
-        # 5. DB에 결과 저장
+        # 6. 데이터 저장
+        print("6/6: 데이터 저장 시작...")
+        Lecture.objects.filter(id=lecture_id).update(current_step=6)
+        save_start_time = time.time()
+        
         lecture = Lecture.objects.get(id=lecture_id)
-        lecture.current_step = 5
         lecture.full_script = full_script_ts
         lecture.summary_json = summary_json
         lecture.status = 'completed' # 상태를 '완료'로 변경
         lecture.save()
 
-        # 6. PdfChunk 및 Mapping 모델에도 저장 
+        # PdfChunk 및 Mapping 모델에도 저장 
         for page_num, content in pdf_texts:
             PdfChunk.objects.create(lecture=lecture, page_num=page_num, content=content)
         
@@ -144,6 +164,12 @@ def process_lecture_task(lecture_id):
         Mapping.objects.bulk_create(
             [Mapping(lecture=lecture, **m) for m in mappings_to_create]
         )
+        
+        save_elapsed_sec = time.time() - save_start_time
+        step_times['6'] = save_elapsed_sec
+        lecture.step_times = step_times
+        lecture.save()
+        print(f"6/6: 데이터 저장 완료 (소요 시간: {save_elapsed_sec:.2f}초)")
 
         print(f"처리 완료 (총 {(time.time() - start_time):.2f}초)")
         
@@ -196,11 +222,10 @@ def calculate_etr_task(lecture_id):
             print(f"ETR 계산: 오디오 길이 계산 실패: {e}")
             audio_duration_min = 0
         
-        # PDF 페이지 수 계산
+        # PDF 페이지 수 계산 (빠른 계산용, Ollama 사용 안 함)
         try:
             pdf_path = lecture.pdf_file.path
-            pdf_texts = process_pdf(pdf_path)
-            pdf_page_count = len(pdf_texts) if pdf_texts else 0
+            pdf_page_count = get_pdf_page_count(pdf_path)
         except Exception as e:
             print(f"ETR 계산: PDF 페이지 수 계산 실패: {e}")
             pdf_page_count = 0

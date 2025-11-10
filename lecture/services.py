@@ -5,6 +5,10 @@ import time
 import re
 import logging
 import chromadb
+import ollama
+import base64
+import io
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from django.conf import settings
 
@@ -38,6 +42,59 @@ def init_chromadb_client():
         return client
     except Exception as e:
         logger.error(f"Error initializing ChromaDB: {e}")
+        raise
+
+def init_ollama_client():
+    """Ollama 클라이언트 초기화"""
+    print("Initializing Ollama client...")
+    try:
+        # Ollama 클라이언트 초기화
+        # OLLAMA_BASE_URL에서 호스트 추출 (http://localhost:11434 -> localhost:11434)
+        base_url = settings.OLLAMA_BASE_URL
+        if base_url.startswith('http://'):
+            base_url = base_url[7:]
+        elif base_url.startswith('https://'):
+            base_url = base_url[8:]
+        
+        client = ollama.Client(host=base_url)
+        
+        # 모델이 존재하는지 확인
+        try:
+            models_response = client.list()
+            # ollama 패키지의 반환 형식: ListResponse 객체 (models 속성 포함)
+            model_list = []
+            if hasattr(models_response, 'models'):
+                model_list = models_response.models
+            elif isinstance(models_response, dict) and 'models' in models_response:
+                model_list = models_response['models']
+            elif isinstance(models_response, list):
+                model_list = models_response
+            
+            # 모델 이름 추출
+            model_names = []
+            for m in model_list:
+                if hasattr(m, 'model'):  # Model 객체인 경우
+                    model_names.append(m.model)
+                elif isinstance(m, dict):
+                    model_names.append(m.get('name', m.get('model', str(m))))
+                else:
+                    model_names.append(str(m))
+            
+            # 모델 이름 비교: 'bakllava:latest' 형식도 'bakllava'와 매칭되도록 처리
+            model_found = any(
+                settings.OLLAMA_MODEL in name or name.startswith(settings.OLLAMA_MODEL + ':')
+                for name in model_names
+            )
+            if not model_found:
+                logger.warning(f"Ollama 모델 '{settings.OLLAMA_MODEL}'이 설치되지 않았습니다. 사용 가능한 모델: {model_names}")
+                print(f"경고: 모델 '{settings.OLLAMA_MODEL}'을 찾을 수 없습니다. 'ollama pull {settings.OLLAMA_MODEL}' 명령으로 설치하세요.")
+        except Exception as e:
+            logger.warning(f"Ollama 모델 목록 확인 실패: {e}")
+        
+        print(f"Ollama client initialized (model: {settings.OLLAMA_MODEL}).")
+        return client
+    except Exception as e:
+        logger.error(f"Error initializing Ollama: {e}")
         raise
 
 # --- 1. STT (Gemini API) ---
@@ -92,17 +149,154 @@ def process_audio(_audio_path, _model_flash):
             logger.warning(f"Failed to delete uploaded file {audio_file.name}: {e}")
 
 
-# --- 2. PDF 파싱 (PyMuPDF) ---
-def process_pdf(_pdf_path):
-    print(f"Parsing PDF: {_pdf_path}...")
+# --- 2. PDF 파싱 (Ollama bakllava 모델 사용) ---
+# 이미지 분석용 영어 프롬프트 (test_bakllava_pdf.py와 동일)
+IMAGE_DESCRIPTION_PROMPT = """Describe this image in detail in English. 
+Include all visible text, diagrams, charts, formulas, and visual elements.
+If there are any labels, captions, or annotations, include them in your description.
+Be thorough and accurate in describing what you see."""
+
+def extract_images_from_page(page, pdf_doc):
+    """PDF 페이지에서 이미지 객체들을 추출"""
+    images = []
+    try:
+        image_list = page.get_images(full=True)
+        for img_index, img in enumerate(image_list):
+            try:
+                xref = img[0]
+                base_image = pdf_doc.extract_image(xref)
+                image_bytes = base_image["image"]
+                image_ext = base_image["ext"]
+                
+                # base64로 인코딩
+                img_base64 = base64.b64encode(image_bytes).decode('utf-8')
+                images.append({
+                    'index': img_index,
+                    'base64': img_base64,
+                    'ext': image_ext,
+                    'width': base_image.get('width', 0),
+                    'height': base_image.get('height', 0)
+                })
+            except Exception as e:
+                logger.warning(f"이미지 추출 실패 (인덱스 {img_index}): {e}")
+                continue
+    except Exception as e:
+        logger.warning(f"페이지 이미지 목록 가져오기 실패: {e}")
+    return images
+
+def process_single_page_with_ollama(page_num, page, pdf_doc, ollama_client):
+    """단일 PDF 페이지 처리: 텍스트 추출 + 이미지 분석 (test_bakllava_pdf.py와 동일한 방식)"""
+    try:
+        # 1. PyMuPDF로 텍스트 추출 (정확하고 빠름)
+        page_text = page.get_text("text").strip()
+        
+        # 2. 페이지에서 이미지 추출
+        page_images = extract_images_from_page(page, pdf_doc)
+        
+        # 3. 이미지가 있으면 Ollama로 각 이미지 분석
+        image_descriptions = []
+        if page_images:
+            for img_info in page_images:
+                try:
+                    response = ollama_client.generate(
+                        model=settings.OLLAMA_MODEL,
+                        prompt=IMAGE_DESCRIPTION_PROMPT,
+                        images=[img_info['base64']],
+                        options={
+                            'temperature': 0.1,
+                        }
+                    )
+                    
+                    if hasattr(response, 'response'):
+                        img_description = response.response.strip()
+                    elif isinstance(response, dict):
+                        img_description = response.get('response', '').strip()
+                    else:
+                        img_description = str(response).strip()
+                    
+                    if img_description:
+                        image_descriptions.append(f"[Image {img_info['index'] + 1}]: {img_description}")
+                except Exception as e:
+                    logger.warning(f"이미지 {img_info['index'] + 1} 분석 실패: {e}")
+                    image_descriptions.append(f"[Image {img_info['index'] + 1}]: Error analyzing image - {str(e)}")
+        
+        # 4. 텍스트와 이미지 설명 결합
+        combined_content = []
+        if page_text:
+            combined_content.append("=== Text Content ===")
+            combined_content.append(page_text)
+        
+        if image_descriptions:
+            if combined_content:
+                combined_content.append("\n")
+            combined_content.append("=== Image Descriptions ===")
+            combined_content.extend(image_descriptions)
+        
+        final_text = "\n".join(combined_content) if combined_content else ""
+        
+        return (page_num + 1, final_text)
+    except Exception as e:
+        logger.error(f"페이지 {page_num + 1} 처리 중 오류 발생: {e}")
+        return (page_num + 1, "")
+
+def get_pdf_page_count(_pdf_path):
+    """PDF의 페이지 수만 빠르게 계산 (ETR 계산용)"""
     try:
         doc = fitz.open(_pdf_path)
+        page_count = len(doc)
+        doc.close()
+        return page_count
+    except Exception as e:
+        logger.error(f"PDF 페이지 수 계산 실패: {e}")
+        return 0
+
+def process_pdf(_pdf_path, ollama_client=None):
+    """PDF를 페이지별로 파싱하고 Ollama bakllava 모델로 이미지와 텍스트 추출
+    (test_bakllava_pdf.py와 동일한 방식: PyMuPDF 텍스트 추출 + 이미지 분석)"""
+    print(f"Parsing PDF with Ollama: {_pdf_path}...")
+    
+    if ollama_client is None:
+        ollama_client = init_ollama_client()
+    
+    try:
+        doc = fitz.open(_pdf_path)
+        total_pages = len(doc)
         pdf_texts = []
-        for page_num, page in enumerate(doc):
-            text = page.get_text("text")
-            if text.strip():
-                pdf_texts.append((page_num + 1, text))
-        print(f"PDF parsing complete. {len(pdf_texts)} pages extracted.")
+        
+        # 배치 크기 설정
+        batch_size = settings.OLLAMA_BATCH_SIZE
+        
+        print(f"총 {total_pages}페이지를 배치 크기 {batch_size}로 처리합니다...")
+        print("(텍스트는 즉시 추출, 이미지가 있는 페이지만 Ollama로 분석)")
+        
+        # 배치 단위로 처리
+        for batch_start in tqdm(range(0, total_pages, batch_size), desc="PDF 페이지 배치 처리"):
+            batch_end = min(batch_start + batch_size, total_pages)
+            batch_pages = list(range(batch_start, batch_end))
+            
+            # 병렬 처리로 배치 내 페이지들 처리
+            with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                futures = {
+                    executor.submit(process_single_page_with_ollama, page_num, doc[page_num], doc, ollama_client): page_num
+                    for page_num in batch_pages
+                }
+                
+                # 완료된 작업부터 결과 수집
+                for future in as_completed(futures):
+                    try:
+                        result = future.result()
+                        pdf_texts.append(result)  # 빈 텍스트도 포함
+                    except Exception as e:
+                        page_num = futures[future]
+                        logger.error(f"페이지 {page_num + 1} 처리 실패: {e}")
+                        pdf_texts.append((page_num + 1, ""))
+        
+        doc.close()
+        
+        # 페이지 번호 순으로 정렬
+        pdf_texts.sort(key=lambda x: x[0])
+        
+        print(f"PDF parsing complete. {len(pdf_texts)} pages processed.")
         return pdf_texts
     except Exception as e:
         logger.error(f"PDF 파싱 중 오류 발생: {e}")
