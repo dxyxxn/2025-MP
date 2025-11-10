@@ -307,7 +307,7 @@ def get_rag_response(lecture_id, query_text, _model_flash, _model_embedding, _ch
         return "관련된 강의 내용을 찾지 못했습니다."
 
     for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-        source_info = f"[출처: PDF {meta['page']}p]" if meta["source"] == "pdf" else f"[출처: 스크립트 {meta['timestamp']}]"
+        source_info = f"[PDF {meta['page']}p]" if meta["source"] == "pdf" else f"[스크립트 {meta['timestamp']}]"
         context += f"{source_info}\n{doc}\n\n"
         sources.append(source_info)
         
