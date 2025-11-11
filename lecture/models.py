@@ -15,15 +15,14 @@ class CustomUser(AbstractUser):
     커스텀 User 모델
     Django의 AbstractUser를 상속받아 기본 User 기능을 모두 포함합니다.
     
-    컬럼:
+    현재 서비스에서 실사용 중인 주요 컬럼:
     - id: INTEGER (PK, 자동 생성)
     - username: VARCHAR(150), UNIQUE (로그인 아이디)
+    - email: VARCHAR(254) (회원가입에서 입력받는 이메일)
     - password: VARCHAR(128) (해시된 비밀번호)
-    - email: VARCHAR(254)
-    - first_name: VARCHAR(150)
-    - last_name: VARCHAR(150)
-    - is_staff: BOOLEAN (관리자 페이지 접근 여부)
-    - is_active: BOOLEAN (활성 계정 여부)
+    - is_active: BOOLEAN (계정 활성화 여부, 인증 로직에서 사용)
+    - is_staff: BOOLEAN (관리자 접근 권한 플래그)
+    - last_login: DATETIME (Django 인증 프레임워크가 로그인 시 자동 갱신)
     - date_joined: DATETIME (가입 일시)
     """
     # AbstractUser가 이미 모든 필드를 포함하므로 추가 필드 정의 불필요
