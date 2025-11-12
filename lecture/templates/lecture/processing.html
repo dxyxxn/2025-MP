@@ -76,6 +76,7 @@
          data-lecture-id="{{ lecture.id }}"
          data-current-step="{{ lecture.current_step }}"
          data-estimated-time-sec="{{ lecture.estimated_time_sec }}"
+         data-youtube-url="{% if lecture.youtube_url %}{{ lecture.youtube_url }}{% else %}{% endif %}"
          data-status-url="{% url 'api_lecture_status' lecture.id %}"
          data-detail-url="{% url 'lecture_detail' lecture.id %}"
          data-upload-url="{% url 'upload' %}"
@@ -90,6 +91,8 @@
         const lectureId = parseInt(checker.dataset.lectureId);
         const initialStep = parseInt(checker.dataset.currentStep) || 0;
         const estimatedTimeSec = parseInt(checker.dataset.estimatedTimeSec) || 0;
+        const youtubeUrl = checker.dataset.youtubeUrl || '';
+        const isYoutubeUrl = youtubeUrl.length > 0;
         const statusUrl = checker.dataset.statusUrl;
         const detailUrl = checker.dataset.detailUrl;
         const uploadUrl = checker.dataset.uploadUrl;
@@ -135,7 +138,7 @@
         
         // 단계별 설명 (4단계 구조)
         const stepDescriptions = {
-            0: '초기화 중...',
+            0: isYoutubeUrl ? 'YouTube 오디오 다운로드 중...' : '초기화 중...',
             1: 'STT 처리 및 PDF 파싱 중...',
             2: '요약 생성 및 임베딩 중...',
             3: '의미 기반 매핑 중...',

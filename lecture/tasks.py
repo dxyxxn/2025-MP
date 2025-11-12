@@ -9,9 +9,11 @@ from .services import (
 import time
 import subprocess
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.db import transaction
 from django.utils import timezone
+from django.conf import settings
 from datetime import timedelta
 
 def get_audio_duration_fast(audio_path):
@@ -187,12 +189,12 @@ def mark_lecture_as_failed(lecture_id, error_message=None):
     except Exception as e:
         print(f"강의 {lecture_id} 상태 업데이트 실패: {e}")
 
-def check_and_mark_stuck_tasks(minutes=15, dry_run=False):
+def check_and_mark_stuck_tasks(minutes=18, dry_run=False):
     """
     오래된 '처리 중' 상태의 강의를 감지하고 실패로 표시하는 함수
     
     Args:
-        minutes: 몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 15)
+        minutes: 몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 18)
         dry_run: 실제로 상태를 변경하지 않고 확인만 할지 여부 (기본값: False)
     
     Returns:
@@ -250,6 +252,10 @@ def process_lecture_task(self, lecture_id):
         ollama_client = init_ollama_client()
 
         start_time = time.time()
+        
+        # 오디오 파일 확인
+        if not lecture.audio_file:
+            raise Exception("오디오 파일이 없습니다. YouTube 다운로드가 완료되지 않았을 수 있습니다.")
         
         # 오디오 길이와 PDF 페이지 수 계산 (통계 업데이트용)
         audio_path = lecture.audio_file.path
@@ -490,12 +496,18 @@ def calculate_etr_task(lecture_id):
         lecture = Lecture.objects.get(id=lecture_id)
         
         # 오디오 길이 계산 (빠른 방법 사용)
-        try:
-            audio_path = lecture.audio_file.path
-            audio_duration_sec = get_audio_duration_fast(audio_path)
-            audio_duration_min = audio_duration_sec / 60.0 if audio_duration_sec else 0
-        except Exception as e:
-            print(f"ETR 계산: 오디오 길이 계산 실패: {e}")
+        audio_duration_min = 0
+        if lecture.audio_file:
+            try:
+                audio_path = lecture.audio_file.path
+                audio_duration_sec = get_audio_duration_fast(audio_path)
+                audio_duration_min = audio_duration_sec / 60.0 if audio_duration_sec else 0
+            except Exception as e:
+                print(f"ETR 계산: 오디오 길이 계산 실패: {e}")
+                audio_duration_min = 0
+        else:
+            # YouTube 다운로드가 아직 완료되지 않은 경우
+            print(f"ETR 계산: 오디오 파일이 아직 준비되지 않았습니다. (YouTube 다운로드 중일 수 있음)")
             audio_duration_min = 0
         
         # PDF 페이지 수 계산 (빠른 계산용, Ollama 사용 안 함)
@@ -552,6 +564,149 @@ def calculate_etr_task(lecture_id):
         except:
             pass
 
+@shared_task(bind=True, max_retries=0)
+def start_process_from_url_task(self, lecture_id):
+    """
+    YouTube URL에서 오디오를 다운로드하고 처리 파이프라인을 시작하는 태스크
+    
+    Args:
+        self: Celery 작업 인스턴스 (bind=True로 인해 자동 전달)
+        lecture_id: 처리할 강의 ID
+    """
+    try:
+        lecture = Lecture.objects.get(id=lecture_id)
+        
+        if not lecture.youtube_url:
+            raise Exception("YouTube URL이 없습니다.")
+        
+        print(f"[YouTube 다운로드] 시작: {lecture.youtube_url}")
+        
+        # 다운로드할 파일 경로 생성
+        # audio_upload_path 함수와 동일한 로직 사용
+        user_dir = os.path.join(settings.MEDIA_ROOT, str(lecture.user.id))
+        os.makedirs(user_dir, exist_ok=True)
+        
+        # 파일명에서 특수문자 제거 (안전한 파일명 생성)
+        safe_lecture_name = "".join(c for c in lecture.lecture_name if c.isalnum() or c in (' ', '-', '_')).strip()
+        safe_lecture_name = safe_lecture_name.replace(' ', '_')
+        
+        # 임시 파일명 생성 (확장자는 yt-dlp가 결정)
+        temp_filename = f"{safe_lecture_name}_audio_temp"
+        temp_path = os.path.join(user_dir, temp_filename)
+        
+        # yt-dlp를 사용하여 오디오만 다운로드 (실시간 출력 파싱)
+        # --extract-audio: 오디오만 추출
+        # --audio-format mp3: MP3 형식으로 변환
+        # --output: 출력 파일 경로 (확장자 없이, yt-dlp가 자동으로 추가)
+        # --progress: 진행률 표시 (기본값이지만 명시)
+        try:
+            process = subprocess.Popen(
+                [
+                    'yt-dlp',
+                    '--extract-audio',
+                    '--audio-format', 'mp3',
+                    '--output', temp_path + '.%(ext)s',
+                    '--no-playlist',
+                    '--newline',  # 실시간 출력을 위해 줄바꿈 강제
+                    lecture.youtube_url
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,  # 라인 버퍼링
+                universal_newlines=True
+            )
+            
+            # ETA 파싱을 위한 정규식
+            # 예: [download]  42.2% of   46.79MiB at    2.27MiB/s ETA 00:11
+            eta_pattern = re.compile(r'ETA\s+(\d{2}):(\d{2})')
+            percent_pattern = re.compile(r'\[download\]\s+(\d+\.?\d*)%')
+            
+            # 실시간 출력 파싱
+            for line in iter(process.stdout.readline, ''):
+                if not line:
+                    break
+                
+                line = line.strip()
+                print(f"{line}")  # 로그 출력
+                
+                # ETA 추출 (MM:SS 형식) - 단계 0에서는 ETA를 표시하지 않으므로 업데이트하지 않음
+                # eta_match = eta_pattern.search(line)
+                # if eta_match:
+                #     minutes = int(eta_match.group(1))
+                #     seconds = int(eta_match.group(2))
+                #     eta_sec = minutes * 60 + seconds
+                #     
+                #     # Lecture 모델에 ETA 업데이트
+                #     Lecture.objects.filter(id=lecture_id).update(youtube_download_eta_sec=eta_sec)
+                
+                # 진행률 추출 (선택적, 로깅용)
+                percent_match = percent_pattern.search(line)
+                if percent_match:
+                    percent = float(percent_match.group(1))
+                    # 필요시 진행률도 저장할 수 있음
+            
+            # 프로세스 완료 대기
+            return_code = process.wait(timeout=600)  # 10분 타임아웃
+            
+            if return_code != 0:
+                raise Exception(f"YouTube 다운로드 실패 (반환 코드: {return_code})")
+                
+        except subprocess.TimeoutExpired:
+            process.kill()
+            raise Exception("YouTube 다운로드가 타임아웃되었습니다. (10분 초과)")
+        except Exception as e:
+            if 'process' in locals():
+                process.kill()
+            raise Exception(f"YouTube 다운로드 실패: {str(e)}")
+        
+        # 다운로드된 파일 찾기 (yt-dlp가 확장자를 추가했을 수 있음)
+        downloaded_file = None
+        possible_extensions = ['mp3', 'm4a', 'webm', 'opus']
+        for ext in possible_extensions:
+            candidate = f"{temp_path}.{ext}"
+            if os.path.exists(candidate):
+                downloaded_file = candidate
+                break
+        
+        if not downloaded_file or not os.path.exists(downloaded_file):
+            raise Exception("다운로드된 오디오 파일을 찾을 수 없습니다.")
+        
+        # 최종 파일명 생성 (audio_upload_path와 동일한 형식)
+        final_filename = f"{safe_lecture_name}_audio.mp3"
+        final_path = os.path.join(user_dir, final_filename)
+        
+        # 파일이 이미 존재하면 삭제
+        if os.path.exists(final_path):
+            os.remove(final_path)
+        
+        # 임시 파일을 최종 경로로 이동
+        os.rename(downloaded_file, final_path)
+        
+        # 상대 경로 계산 (MEDIA_ROOT 기준)
+        relative_path = os.path.join(str(lecture.user.id), final_filename)
+        
+        # Lecture 모델의 audio_file 필드 업데이트
+        lecture.audio_file.name = relative_path
+        lecture.save()
+        
+        print(f"[YouTube 다운로드] 파일 저장 완료: {final_path}")
+        
+        # 기존 처리 파이프라인 시작
+        print(f"[YouTube 다운로드] 처리 파이프라인 시작...")
+        process_lecture_task.delay(lecture_id)
+        
+        # ETR 계산 태스크 호출 (비동기, 빠른 계산)
+        calculate_etr_task.delay(lecture_id)
+        
+    except Exception as e:
+        print(f"[YouTube 다운로드] 실패: {e}")
+        error_message = str(e)
+        # 실패 상태로 표시
+        mark_lecture_as_failed(lecture_id, error_message)
+        # 예외를 다시 발생시켜 Celery가 실패를 기록하도록 함
+        raise
+
 
 # Celery 시그널 핸들러: 작업 실패 시 강의 상태를 실패로 업데이트 (보조적 역할)
 # 주의: 작업 내부에서 이미 실패 처리를 하고 있으므로, 이 핸들러는 추가 보호 역할만 합니다.
@@ -570,7 +725,7 @@ def task_failure_handler(sender=None, task_id=None, exception=None, traceback=No
             elif isinstance(sender, str):
                 task_name = sender
         
-        if task_name and 'process_lecture_task' in task_name:
+        if task_name and ('process_lecture_task' in task_name or 'start_process_from_url_task' in task_name):
             # Celery 결과 백엔드에서 작업 정보 가져오기 시도
             try:
                 from celery.result import AsyncResult
@@ -605,7 +760,7 @@ def worker_ready_handler(sender=None, **kwargs):
     """
     try:
         print("[Celery 워커 시작] 오래된 작업을 자동으로 체크합니다...")
-        check_and_mark_stuck_tasks(minutes=15, dry_run=False)
+        check_and_mark_stuck_tasks(minutes=18, dry_run=False)
     except Exception as e:
         # 워커 시작 시 체크 실패는 무시 (워커는 계속 실행되어야 함)
         print(f"[Celery 워커 시작] 오래된 작업 체크 중 오류 발생 (무시됨): {e}")

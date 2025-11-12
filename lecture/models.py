@@ -37,13 +37,15 @@ class Lecture(models.Model):
     """
     강의 모델
     사용자가 업로드한 강의 음성 파일과 PDF 파일을 저장하고 처리 상태를 관리합니다.
+    YouTube URL을 통한 음성 다운로드도 지원합니다.
     
     컬럼:
     - id: INTEGER (PK, 자동 생성)
     - user_id: INTEGER (FK, CustomUser 참조) - 강의를 업로드한 사용자
     - lecture_name: VARCHAR(255) - 강의 이름
-    - audio_file: VARCHAR(100) - 음성 파일 경로 (MEDIA_ROOT 기준)
+    - audio_file: VARCHAR(100) - 음성 파일 경로 (MEDIA_ROOT 기준, NULL 허용)
     - pdf_file: VARCHAR(100) - PDF 파일 경로 (MEDIA_ROOT 기준)
+    - youtube_url: VARCHAR(500) - YouTube URL (NULL 허용, 파일 업로드 대신 사용 가능)
     - full_script: TEXT (NULL 허용) - STT 처리된 전체 스크립트 (타임스탬프 포함)
     - summary_json: JSON (NULL 허용) - Gemini로 생성된 요약 JSON 데이터
     - status: VARCHAR(20) - 처리 상태 ('processing': 처리 중, 'completed': 완료, 'failed': 실패)
@@ -63,8 +65,9 @@ class Lecture(models.Model):
     lecture_name = models.CharField(max_length=255, verbose_name="강의 이름")
     
     # FileField는 파일 자체를 'MEDIA_ROOT'에 저장합니다.
-    audio_file = models.FileField(upload_to=audio_upload_path, verbose_name="음성 파일")
+    audio_file = models.FileField(upload_to=audio_upload_path, verbose_name="음성 파일", blank=True, null=True)
     pdf_file = models.FileField(upload_to=pdf_upload_path, verbose_name="PDF 파일")
+    youtube_url = models.URLField(max_length=500, blank=True, null=True, verbose_name="YouTube URL")
     
     full_script = models.TextField(blank=True, null=True, verbose_name="전체 스크립트")
     summary_json = models.JSONField(blank=True, null=True, verbose_name="요약 JSON")
@@ -76,6 +79,8 @@ class Lecture(models.Model):
     estimated_time_sec = models.IntegerField(default=0, verbose_name="예상 소요 시간(초)")
     # 단계별 소요 시간(초) - JSON 형식: {"1": 10.5, "2": 25.3, ...}
     step_times = models.JSONField(default=dict, blank=True, verbose_name="단계별 소요 시간")
+    # YouTube 다운로드 ETA(초) - YouTube URL을 사용하는 경우 다운로드 예상 소요 시간
+    youtube_download_eta_sec = models.IntegerField(default=0, verbose_name="YouTube 다운로드 ETA(초)")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

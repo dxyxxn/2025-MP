@@ -122,8 +122,8 @@ def process_audio(_audio_path, _model_flash):
     ]
     
     try:
-        # 타임아웃 10분(600초) 설정 (Pro 모델 사용 시 900초 권장)
-        response = _model_flash.generate_content(prompt, request_options={"timeout": 600})
+        # 타임아웃 500초 설정 (Pro 모델 사용 시 900초 권장)
+        response = _model_flash.generate_content(prompt, request_options={"timeout": 500})
         
         full_script_ts = response.text
         
@@ -315,38 +315,96 @@ def process_pdf(_pdf_path, ollama_client=None):
             page_timeout = max_images_per_page * single_image_timeout + 10  # 여유 시간 10초 추가
             batch_timeout = page_timeout * len(batch_pages) + 30  # 배치 전체 타임아웃
             
-            with ThreadPoolExecutor(max_workers=batch_size) as executor:
-                futures = {
-                    executor.submit(process_single_page_with_ollama, page_num, doc[page_num], doc, ollama_client): page_num
-                    for page_num in batch_pages
-                }
-                
-                # 완료된 작업부터 결과 수집 (타임아웃 적용)
-                completed_pages = set()
+            # 배치 처리 재시도 로직
+            batch_retry_count = 0
+            batch_max_retries = settings.OLLAMA_MAX_RETRIES
+            batch_success = False
+            batch_results = {}  # {page_num: result}
+            
+            while batch_retry_count <= batch_max_retries and not batch_success:
                 try:
-                    for future in as_completed(futures, timeout=batch_timeout):
+                    with ThreadPoolExecutor(max_workers=batch_size) as executor:
+                        futures = {
+                            executor.submit(process_single_page_with_ollama, page_num, doc[page_num], doc, ollama_client): page_num
+                            for page_num in batch_pages
+                        }
+                        
+                        # 완료된 작업부터 결과 수집 (타임아웃 적용)
+                        completed_pages = set()
+                        batch_failed = False
+                        
                         try:
-                            # 각 future에 타임아웃 적용
-                            result = future.result(timeout=page_timeout)
-                            pdf_texts.append(result)  # 빈 텍스트도 포함
-                            completed_pages.add(futures[future])
-                        except TimeoutError as e:
-                            page_num = futures.get(future, 'unknown')
-                            error_msg = f"페이지 {page_num + 1 if isinstance(page_num, int) else page_num} 처리 타임아웃 ({page_timeout}초 초과)"
-                            logger.error(error_msg)
-                            pdf_texts.append((page_num + 1 if isinstance(page_num, int) else 0, ""))
-                            completed_pages.add(page_num if isinstance(page_num, int) else 'unknown')
-                        except Exception as e:
-                            page_num = futures.get(future, 'unknown')
-                            logger.error(f"페이지 {page_num + 1 if isinstance(page_num, int) else page_num} 처리 실패: {e}")
-                            pdf_texts.append((page_num + 1 if isinstance(page_num, int) else 0, ""))
-                            completed_pages.add(page_num if isinstance(page_num, int) else 'unknown')
-                except TimeoutError:
-                    # 배치 전체 타임아웃 발생 - 남은 페이지들을 빈 결과로 처리
-                    logger.error(f"배치 처리 타임아웃 ({batch_timeout}초 초과). 남은 페이지들을 빈 결과로 처리합니다.")
-                    for future, page_num in futures.items():
-                        if page_num not in completed_pages:
-                            pdf_texts.append((page_num + 1 if isinstance(page_num, int) else 0, ""))
+                            for future in as_completed(futures, timeout=batch_timeout):
+                                try:
+                                    # 각 future에 타임아웃 적용
+                                    result = future.result(timeout=page_timeout)
+                                    page_num = futures[future]
+                                    batch_results[page_num] = result
+                                    completed_pages.add(page_num)
+                                except TimeoutError as e:
+                                    page_num = futures.get(future, 'unknown')
+                                    error_msg = f"페이지 {page_num + 1 if isinstance(page_num, int) else page_num} 처리 타임아웃 ({page_timeout}초 초과)"
+                                    logger.warning(error_msg)
+                                    if isinstance(page_num, int):
+                                        batch_results[page_num] = (page_num + 1, "")
+                                        completed_pages.add(page_num)
+                                    batch_failed = True
+                                except Exception as e:
+                                    page_num = futures.get(future, 'unknown')
+                                    logger.warning(f"페이지 {page_num + 1 if isinstance(page_num, int) else page_num} 처리 실패: {e}")
+                                    if isinstance(page_num, int):
+                                        batch_results[page_num] = (page_num + 1, "")
+                                        completed_pages.add(page_num)
+                                    batch_failed = True
+                            
+                            # 모든 페이지가 완료되었는지 확인
+                            if len(completed_pages) == len(batch_pages):
+                                batch_success = True
+                            else:
+                                batch_failed = True
+                                
+                        except TimeoutError:
+                            # 배치 전체 타임아웃 발생
+                            logger.warning(f"배치 처리 타임아웃 ({batch_timeout}초 초과). 재시도 {batch_retry_count}/{batch_max_retries}")
+                            batch_failed = True
+                            
+                            # 완료되지 않은 페이지들을 빈 결과로 처리
+                            for page_num in batch_pages:
+                                if page_num not in completed_pages:
+                                    batch_results[page_num] = (page_num + 1, "")
+                    
+                    # 재시도 필요 여부 확인
+                    if batch_failed and batch_retry_count < batch_max_retries:
+                        batch_retry_count += 1
+                        logger.info(f"배치 재시도 {batch_retry_count}/{batch_max_retries} (페이지 {batch_start + 1}-{batch_end})")
+                        time.sleep(2)  # 재시도 전 잠시 대기
+                    elif batch_failed:
+                        # 최대 재시도 횟수 초과 - 남은 페이지들을 빈 결과로 처리
+                        logger.error(f"배치 처리 실패 (재시도 {batch_max_retries}회 후 포기). 남은 페이지들을 빈 결과로 처리합니다.")
+                        for page_num in batch_pages:
+                            if page_num not in batch_results:
+                                batch_results[page_num] = (page_num + 1, "")
+                        batch_success = True  # 포기하고 다음 배치로
+                    else:
+                        batch_success = True
+                        
+                except Exception as e:
+                    logger.error(f"배치 처리 중 예외 발생: {e}")
+                    if batch_retry_count < batch_max_retries:
+                        batch_retry_count += 1
+                        logger.info(f"배치 재시도 {batch_retry_count}/{batch_max_retries} (예외 발생)")
+                        time.sleep(2)
+                    else:
+                        # 최대 재시도 횟수 초과
+                        logger.error(f"배치 처리 실패 (재시도 {batch_max_retries}회 후 포기)")
+                        for page_num in batch_pages:
+                            if page_num not in batch_results:
+                                batch_results[page_num] = (page_num + 1, "")
+                        batch_success = True
+            
+            # 배치 결과를 pdf_texts에 추가
+            for page_num in sorted(batch_results.keys()):
+                pdf_texts.append(batch_results[page_num])
         
         doc.close()
         
@@ -414,7 +472,8 @@ def get_summary_from_gemini(_model_flash, script_text_with_timestamp):
     """
     
     try:
-        response = _model_flash.generate_content(prompt)
+        # 타임아웃 500초 설정 (STT와 동일, Pro 모델 사용 시 900초 권장)
+        response = _model_flash.generate_content(prompt, request_options={"timeout": 500})
         json_str = response.text.strip().lstrip("```json").rstrip("```")
         summary_data = json.loads(json_str)
         print("Summary generation complete.")

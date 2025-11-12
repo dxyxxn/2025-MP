@@ -5,7 +5,7 @@
     python manage.py check_stuck_tasks [--minutes MINUTES] [--dry-run]
 
 옵션:
-    --minutes: 몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 15)
+    --minutes: 몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 18)
     --dry-run: 실제로 상태를 변경하지 않고 어떤 작업이 영향을 받을지만 표시
 """
 from django.core.management.base import BaseCommand
@@ -19,8 +19,8 @@ class Command(BaseCommand):
         parser.add_argument(
             '--minutes',
             type=int,
-            default=15,
-            help='몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 15)',
+            default=18,
+            help='몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 18)',
         )
         parser.add_argument(
             '--dry-run',

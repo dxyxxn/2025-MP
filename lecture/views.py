@@ -8,7 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 import os
 from .models import Lecture, ProcessingStats
-from .tasks import process_lecture_task, calculate_etr_task # Celery 태스크 임포트
+from .tasks import process_lecture_task, calculate_etr_task, start_process_from_url_task # Celery 태스크 임포트
 from .services import init_gemini_models, init_chromadb_client, get_rag_response
 import json
 
@@ -78,13 +78,40 @@ def logout_view(request):
 def upload_view(request):
     if request.method == 'POST':
         lecture_name = request.POST.get('lecture_name', '').strip()
+        audio_input_type = request.POST.get('audio_input_type', 'file')
         audio_file = request.FILES.get('audio_file')
+        youtube_url = request.POST.get('youtube_url', '').strip()
         pdf_file = request.FILES.get('pdf_file')
         
         # 빈 문자열 체크
         if not lecture_name:
             error_message = "강의 이름을 입력해주세요."
-            lectures = Lecture.objects.all().order_by('-created_at')
+            lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
+            return render(request, 'lecture/upload.html', {
+                'lectures': lectures,
+                'error_message': error_message
+            })
+        
+        # 입력 방식 검증
+        if audio_input_type == 'file':
+            if not audio_file:
+                error_message = "음성 파일을 선택해주세요."
+                lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
+                return render(request, 'lecture/upload.html', {
+                    'lectures': lectures,
+                    'error_message': error_message
+                })
+        elif audio_input_type == 'url':
+            if not youtube_url:
+                error_message = "YouTube URL을 입력해주세요."
+                lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
+                return render(request, 'lecture/upload.html', {
+                    'lectures': lectures,
+                    'error_message': error_message
+                })
+        else:
+            error_message = "올바른 입력 방식을 선택해주세요."
+            lectures = Lecture.objects.filter(user=request.user).order_by('-created_at')
             return render(request, 'lecture/upload.html', {
                 'lectures': lectures,
                 'error_message': error_message
@@ -108,20 +135,35 @@ def upload_view(request):
         lecture = None
         try:
             # 1. DB에 파일과 '처리중' 상태 저장
-            lecture = Lecture.objects.create(
-                user=request.user,
-                lecture_name=lecture_name,
-                audio_file=audio_file,
-                pdf_file=pdf_file,
-                status='processing',
-                estimated_time_sec=0  # 초기값, 나중에 업데이트됨
-            )
-            
-            # 2. Celery 태스크 호출 (백그라운드 실행)
-            process_lecture_task.delay(lecture.id)
-            
-            # 3. ETR 계산 태스크 호출 (비동기, 빠른 계산)
-            calculate_etr_task.delay(lecture.id)
+            if audio_input_type == 'file':
+                # 파일 업로드 방식
+                lecture = Lecture.objects.create(
+                    user=request.user,
+                    lecture_name=lecture_name,
+                    audio_file=audio_file,
+                    pdf_file=pdf_file,
+                    status='processing',
+                    estimated_time_sec=0  # 초기값, 나중에 업데이트됨
+                )
+                
+                # 2. Celery 태스크 호출 (백그라운드 실행)
+                process_lecture_task.delay(lecture.id)
+                
+                # 3. ETR 계산 태스크 호출 (비동기, 빠른 계산)
+                calculate_etr_task.delay(lecture.id)
+            else:
+                # YouTube URL 방식
+                lecture = Lecture.objects.create(
+                    user=request.user,
+                    lecture_name=lecture_name,
+                    pdf_file=pdf_file,
+                    youtube_url=youtube_url,
+                    status='processing',
+                    estimated_time_sec=0  # 초기값, 나중에 업데이트됨
+                )
+                
+                # 2. YouTube 다운로드 및 처리 태스크 호출 (백그라운드 실행)
+                start_process_from_url_task.delay(lecture.id)
             
             # 4. 처리 중 페이지로 즉시 리다이렉트
             return redirect('lecture_detail', lecture_id=lecture.id)
@@ -243,5 +285,6 @@ def api_lecture_status_view(request, lecture_id):
         'name': lecture.lecture_name,
         'current_step': current_step,
         'estimated_time_sec': lecture.estimated_time_sec,
-        'step_time': step_time  # 현재 단계의 소요 시간
+        'step_time': step_time,  # 현재 단계의 소요 시간
+        'youtube_url': lecture.youtube_url if lecture.youtube_url else None  # YouTube URL 여부 확인용
     })

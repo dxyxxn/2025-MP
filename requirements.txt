@@ -29,3 +29,6 @@ pydub>=0.25.1
 # Ollama for local LLM (PDF 이미지 분석, 타임아웃 및 재시도 지원)
 ollama>=0.1.0
 
+# YouTube video/audio download (YouTube URL을 통한 오디오 다운로드)
+yt-dlp>=2023.12.0
+

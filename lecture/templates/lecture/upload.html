@@ -51,11 +51,30 @@
                             </div>
                             
                             <div class="mb-3">
-                                <label for="audio_file" class="form-label">
-                                    <i class="bi bi-file-earmark-music"></i> 음성 파일
+                                <label class="form-label">
+                                    <i class="bi bi-file-earmark-music"></i> 음성 파일 또는 YouTube URL
                                 </label>
-                                <input type="file" class="form-control" id="audio_file" name="audio_file" accept=".mp3,.m4a,.wav" required>
-                                <div class="form-text">지원 형식: MP3, M4A, WAV</div>
+                                <div class="btn-group w-100 mb-2" role="group" aria-label="입력 방식 선택">
+                                    <input type="radio" class="btn-check" name="audio_input_type" id="audio_file_radio" value="file" checked>
+                                    <label class="btn btn-outline-primary" for="audio_file_radio">
+                                        <i class="bi bi-upload"></i> 파일 업로드
+                                    </label>
+                                    
+                                    <input type="radio" class="btn-check" name="audio_input_type" id="youtube_url_radio" value="url">
+                                    <label class="btn btn-outline-primary" for="youtube_url_radio">
+                                        <i class="bi bi-youtube"></i> YouTube URL
+                                    </label>
+                                </div>
+                                
+                                <div id="audio_file_section">
+                                    <input type="file" class="form-control" id="audio_file" name="audio_file" accept=".mp3,.m4a,.wav">
+                                    <div class="form-text">지원 형식: MP3, M4A, WAV</div>
+                                </div>
+                                
+                                <div id="youtube_url_section" style="display: none;">
+                                    <input type="url" class="form-control" id="youtube_url" name="youtube_url" placeholder="https://www.youtube.com/watch?v=...">
+                                    <div class="form-text">YouTube 동영상 URL을 입력하세요</div>
+                                </div>
                             </div>
                             
                             <div class="mb-3">
@@ -119,5 +138,49 @@
 
     <!-- Bootstrap 5 JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        // 입력 방식에 따라 필드 표시/숨김 및 required 속성 관리
+        const audioFileRadio = document.getElementById('audio_file_radio');
+        const youtubeUrlRadio = document.getElementById('youtube_url_radio');
+        const audioFileSection = document.getElementById('audio_file_section');
+        const youtubeUrlSection = document.getElementById('youtube_url_section');
+        const audioFileInput = document.getElementById('audio_file');
+        const youtubeUrlInput = document.getElementById('youtube_url');
+        const form = document.querySelector('form');
+        
+        function updateInputMode() {
+            if (audioFileRadio.checked) {
+                audioFileSection.style.display = 'block';
+                youtubeUrlSection.style.display = 'none';
+                audioFileInput.required = true;
+                youtubeUrlInput.required = false;
+                youtubeUrlInput.value = '';
+            } else {
+                audioFileSection.style.display = 'none';
+                youtubeUrlSection.style.display = 'block';
+                audioFileInput.required = false;
+                youtubeUrlInput.required = true;
+                audioFileInput.value = '';
+            }
+        }
+        
+        audioFileRadio.addEventListener('change', updateInputMode);
+        youtubeUrlRadio.addEventListener('change', updateInputMode);
+        
+        // 폼 제출 시 검증
+        form.addEventListener('submit', function(e) {
+            if (audioFileRadio.checked && !audioFileInput.files.length) {
+                e.preventDefault();
+                alert('음성 파일을 선택해주세요.');
+                return false;
+            }
+            if (youtubeUrlRadio.checked && !youtubeUrlInput.value.trim()) {
+                e.preventDefault();
+                alert('YouTube URL을 입력해주세요.');
+                return false;
+            }
+        });
+    </script>
 </body>
 </html>
