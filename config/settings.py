@@ -150,6 +150,12 @@ CHROMA_PATH = os.path.join(BASE_DIR, 'chroma_db')
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 
+# Celery 작업 안정성 설정
+# task_acks_late=True: 작업이 완료된 후에만 메시지를 확인 처리 (작업 손실 방지)
+# task_reject_on_worker_lost=True: 워커가 중단되면 작업을 다시 큐에 반환
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+
 # 7. 인증 설정
 AUTH_USER_MODEL = 'lecture.CustomUser'  # 커스텀 User 모델 사용
 LOGIN_URL = '/login/'

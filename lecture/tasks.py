@@ -1,4 +1,5 @@
 from celery import shared_task
+from celery.signals import task_failure, task_postrun
 from .models import Lecture, PdfChunk, Mapping, ProcessingStats
 from .services import (
     init_gemini_models, init_chromadb_client, init_ollama_client,
@@ -9,6 +10,7 @@ import time
 import subprocess
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from django.db import transaction
 
 def get_audio_duration_fast(audio_path):
     """
@@ -167,14 +169,34 @@ def _embedding_worker(lecture_id, pdf_texts, full_script_ts, model_embedding, ch
             'error': str(e)
         }
 
-@shared_task
-def process_lecture_task(lecture_id):
+def mark_lecture_as_failed(lecture_id, error_message=None):
+    """
+    강의를 실패 상태로 표시하는 헬퍼 함수
+    """
+    try:
+        with transaction.atomic():
+            lecture = Lecture.objects.select_for_update().get(id=lecture_id)
+            if lecture.status == 'processing':  # 아직 처리 중인 경우에만 실패로 표시
+                lecture.status = 'failed'
+                lecture.save()
+                print(f"강의 {lecture_id}를 실패 상태로 표시했습니다. (오류: {error_message})")
+    except Lecture.DoesNotExist:
+        print(f"강의 {lecture_id}를 찾을 수 없습니다.")
+    except Exception as e:
+        print(f"강의 {lecture_id} 상태 업데이트 실패: {e}")
+
+@shared_task(bind=True, max_retries=0)
+def process_lecture_task(self, lecture_id):
     """
     강의 처리 메인 태스크 (병렬 처리 버전)
     
     병렬 그룹 1: STT + PDF 파싱 (동시 실행)
     병렬 그룹 2: 요약 + 임베딩 (동시 실행, 그룹 1 완료 후)
     순차 처리: 매핑 + 데이터 저장
+    
+    Args:
+        self: Celery 작업 인스턴스 (bind=True로 인해 자동 전달)
+        lecture_id: 처리할 강의 ID
     """
     try:
         lecture = Lecture.objects.get(id=lecture_id)
@@ -407,12 +429,11 @@ def process_lecture_task(lecture_id):
 
     except Exception as e:
         print(f"작업 실패: {e}")
-        try:
-            lecture = Lecture.objects.get(id=lecture_id)
-            lecture.status = 'failed' # 상태를 '실패'로 변경
-            lecture.save()
-        except:
-            pass
+        error_message = str(e)
+        # 실패 상태로 표시
+        mark_lecture_as_failed(lecture_id, error_message)
+        # 예외를 다시 발생시켜 Celery가 실패를 기록하도록 함
+        raise
 
 @shared_task
 def calculate_etr_task(lecture_id):
@@ -485,3 +506,47 @@ def calculate_etr_task(lecture_id):
             lecture.save()
         except:
             pass
+
+
+# Celery 시그널 핸들러: 작업 실패 시 강의 상태를 실패로 업데이트 (보조적 역할)
+# 주의: 작업 내부에서 이미 실패 처리를 하고 있으므로, 이 핸들러는 추가 보호 역할만 합니다.
+@task_failure.connect
+def task_failure_handler(sender=None, task_id=None, exception=None, traceback=None, einfo=None, **kwargs):
+    """
+    Celery 작업이 실패할 때 호출되는 시그널 핸들러
+    process_lecture_task가 실패한 경우 강의 상태를 'failed'로 업데이트합니다.
+    """
+    try:
+        # 작업 이름 확인
+        task_name = None
+        if sender:
+            if hasattr(sender, 'name'):
+                task_name = sender.name
+            elif isinstance(sender, str):
+                task_name = sender
+        
+        if task_name and 'process_lecture_task' in task_name:
+            # Celery 결과 백엔드에서 작업 정보 가져오기 시도
+            try:
+                from celery.result import AsyncResult
+                from config.celery import app as celery_app
+                
+                result = AsyncResult(task_id, app=celery_app)
+                # 작업 메타데이터에서 인자 가져오기
+                if hasattr(result, 'result') and result.result:
+                    # 결과가 딕셔너리 형태인 경우
+                    pass
+                
+                # 작업 요청 정보에서 인자 가져오기
+                if hasattr(result, 'request') and result.request:
+                    if hasattr(result.request, 'args') and result.request.args:
+                        lecture_id = result.request.args[0]
+                        error_message = str(exception) if exception else "작업이 예기치 않게 종료되었습니다."
+                        mark_lecture_as_failed(lecture_id, error_message)
+                        return
+            except Exception:
+                # 시그널 핸들러 실패는 무시 (작업 내부에서 이미 처리됨)
+                pass
+    except Exception as e:
+        # 시그널 핸들러 오류는 무시 (작업 내부에서 이미 처리됨)
+        pass
