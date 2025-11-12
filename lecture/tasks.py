@@ -1,5 +1,5 @@
 from celery import shared_task
-from celery.signals import task_failure, task_postrun
+from celery.signals import task_failure, task_postrun, worker_ready
 from .models import Lecture, PdfChunk, Mapping, ProcessingStats
 from .services import (
     init_gemini_models, init_chromadb_client, init_ollama_client,
@@ -11,6 +11,8 @@ import subprocess
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from django.db import transaction
+from django.utils import timezone
+from datetime import timedelta
 
 def get_audio_duration_fast(audio_path):
     """
@@ -184,6 +186,49 @@ def mark_lecture_as_failed(lecture_id, error_message=None):
         print(f"강의 {lecture_id}를 찾을 수 없습니다.")
     except Exception as e:
         print(f"강의 {lecture_id} 상태 업데이트 실패: {e}")
+
+def check_and_mark_stuck_tasks(minutes=15, dry_run=False):
+    """
+    오래된 '처리 중' 상태의 강의를 감지하고 실패로 표시하는 함수
+    
+    Args:
+        minutes: 몇 분 이상 지난 작업을 실패로 표시할지 지정 (기본값: 15)
+        dry_run: 실제로 상태를 변경하지 않고 확인만 할지 여부 (기본값: False)
+    
+    Returns:
+        tuple: (발견된 작업 수, 업데이트된 작업 수)
+    """
+    cutoff_time = timezone.now() - timedelta(minutes=minutes)
+    
+    # '처리 중' 상태이고 지정된 시간 이상 지난 강의 찾기
+    stuck_lectures = Lecture.objects.filter(
+        status='processing',
+        created_at__lt=cutoff_time
+    ).order_by('created_at')
+    
+    count = stuck_lectures.count()
+    updated_count = 0
+    
+    if count > 0:
+        print(f"[오래된 작업 감지] {count}개의 오래된 '처리 중' 상태 강의를 발견했습니다. (기준: {minutes}분 이상)")
+        
+        for lecture in stuck_lectures:
+            age_minutes = (timezone.now() - lecture.created_at).total_seconds() / 60
+            print(f"  - 강의 ID {lecture.id}: '{lecture.lecture_name}' (경과: {age_minutes:.1f}분)")
+            
+            if not dry_run:
+                lecture.status = 'failed'
+                lecture.save()
+                updated_count += 1
+        
+        if not dry_run:
+            print(f"[오래된 작업 감지] {updated_count}개의 강의 상태를 '실패'로 업데이트했습니다.")
+        else:
+            print(f"[오래된 작업 감지] --dry-run 모드: {count}개의 강의가 업데이트될 것입니다.")
+    else:
+        print(f"[오래된 작업 감지] 오래된 '처리 중' 상태의 강의가 없습니다. (기준: {minutes}분 이상)")
+    
+    return count, updated_count
 
 @shared_task(bind=True, max_retries=0)
 def process_lecture_task(self, lecture_id):
@@ -550,3 +595,17 @@ def task_failure_handler(sender=None, task_id=None, exception=None, traceback=No
     except Exception as e:
         # 시그널 핸들러 오류는 무시 (작업 내부에서 이미 처리됨)
         pass
+
+# Celery 워커 시작 시 자동으로 오래된 작업 체크
+@worker_ready.connect
+def worker_ready_handler(sender=None, **kwargs):
+    """
+    Celery 워커가 준비되었을 때 호출되는 시그널 핸들러
+    워커 시작 시 오래된 '처리 중' 작업을 자동으로 감지하고 실패로 표시합니다.
+    """
+    try:
+        print("[Celery 워커 시작] 오래된 작업을 자동으로 체크합니다...")
+        check_and_mark_stuck_tasks(minutes=15, dry_run=False)
+    except Exception as e:
+        # 워커 시작 시 체크 실패는 무시 (워커는 계속 실행되어야 함)
+        print(f"[Celery 워커 시작] 오래된 작업 체크 중 오류 발생 (무시됨): {e}")
