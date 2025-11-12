@@ -297,6 +297,21 @@ def process_pdf(_pdf_path, ollama_client=None):
         pdf_texts.sort(key=lambda x: x[0])
         
         print(f"PDF parsing complete. {len(pdf_texts)} pages processed.")
+        
+        # 통계 정보 출력 (test_bakllava_pdf.py와 동일한 형식)
+        if pdf_texts:
+            total_chars = sum(len(text) for _, text in pdf_texts)
+            avg_chars_per_page = total_chars / len(pdf_texts) if pdf_texts else 0
+            pages_with_text = sum(1 for _, text in pdf_texts if text.strip())
+            pages_with_text_ratio = pages_with_text / len(pdf_texts) * 100 if pdf_texts else 0
+            
+            print("== PDF 처리 결과 통계 ==")
+            print(f"총 페이지 수: {len(pdf_texts)}")
+            print(f"텍스트가 있는 페이지: {pages_with_text}")
+            print(f"텍스트가 있는 페이지 비율: {pages_with_text_ratio:.1f}%")
+            print(f"총 문자 수: {total_chars:,}자")
+            print(f"페이지당 평균 문자 수: {avg_chars_per_page:,.0f}자")
+        
         return pdf_texts
     except Exception as e:
         logger.error(f"PDF 파싱 중 오류 발생: {e}")
