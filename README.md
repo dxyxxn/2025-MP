@@ -171,9 +171,11 @@ AI가 컨텍스트 기반 답변 생성
 ### 핵심 모델
 - **CustomUser**: 사용자 계정 정보
 - **Lecture**: 강의 메타데이터 및 처리 상태
+  - `status`: 처리 상태 (`processing`: 처리 중, `completed`: 완료, `failed`: 실패)
   - `current_step`: 현재 처리 단계 (0, 1, 3, 5, 6 - 병렬 구조 반영)
   - `step_times`: 단계별 소요 시간 (JSON 형식)
   - `estimated_time_sec`: 예상 소요 시간(초, 병렬 구조 기반 계산)
+  - `created_at`: 강의 생성 일시 (오래된 작업 감지에 사용)
 - **PdfChunk**: PDF 페이지별 텍스트 내용 (텍스트 + 이미지 설명 포함)
 - **Mapping**: 요약 소주제와 PDF 페이지의 의미 기반 매핑
 - **ProcessingStats**: 처리 속도 통계 (ETR 예측용)
@@ -275,12 +277,35 @@ AI가 컨텍스트 기반 답변 생성
 5. Celery 워커 실행: `celery -A config worker -l info` (별도 터미널)
 6. Django 서버 실행: `python manage.py runserver`
 
+### 작업 실패 처리 및 복구
+시스템은 작업 실패를 자동으로 감지하고 처리합니다:
+
+- **자동 실패 처리**: Celery 작업이 실패하거나 예외가 발생하면 자동으로 강의 상태를 `failed`로 업데이트
+- **작업 안정성**: Celery 설정으로 작업 손실 방지 (`task_acks_late`, `task_reject_on_worker_lost`)
+- **오래된 작업 감지**: 오래된 "처리 중" 상태의 작업을 감지하고 실패로 표시하는 관리 명령어 제공
+
+#### 오래된 작업 감지 명령어
+```bash
+# 기본값(15분) 이상 지난 "처리 중" 작업을 실패로 표시
+python manage.py check_stuck_tasks
+
+# 지정된 시간 이상 지난 작업만 실패로 표시
+python manage.py check_stuck_tasks --minutes 10
+
+# 실제로 변경하지 않고 확인만 (dry-run)
+python manage.py check_stuck_tasks --dry-run
+```
+
+이 명령어를 주기적으로 실행하거나 cron job으로 설정하여 오래된 작업을 자동으로 감지할 수 있습니다.
+
 ## 주요 특징
 
 - **병렬 처리 최적화**: 독립적인 작업들을 동시에 실행하여 전체 처리 시간 단축
   - 병렬 그룹 1: STT + PDF 파싱 동시 실행
   - 병렬 그룹 2: 요약 + 임베딩 동시 실행
 - **비동기 처리**: Celery를 사용하여 파일 업로드 후 즉시 응답, 백그라운드에서 처리
+- **작업 실패 처리**: 작업 실패 시 자동으로 상태를 `failed`로 업데이트하고, 오래된 "처리 중" 작업을 감지하는 관리 명령어 제공
+- **작업 안정성**: Celery 설정으로 작업 손실 방지 및 워커 중단 시 작업 재시도 지원
 - **실시간 진행 상황**: 처리 중 페이지에서 4단계별 진행률 및 소요 시간 표시 (병렬 구조 반영)
 - **하이브리드 PDF 처리**: PyMuPDF로 정확한 텍스트 추출 + Ollama로 이미지 분석
 - **Ollama 타임아웃 및 재시도**: PDF 이미지 분석 시 타임아웃 및 자동 재시도로 안정성 향상
