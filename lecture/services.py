@@ -101,11 +101,29 @@ def init_ollama_client():
 def process_audio(_audio_path, _model_flash):
     """Gemini API를 사용해 오디오 파일에서 스크립트 추출"""
     
-    print(f"Uploading audio to Gemini: {_audio_path}...")
-    try:
-        audio_file = genai.upload_file(path=_audio_path)
-    except Exception as e:
-        logger.error(f"오디오 파일 업로드 실패: {e}")
+    # 파일 업로드 재시도 로직
+    max_upload_retries = 3
+    upload_retry_count = 0
+    audio_file = None
+    
+    while upload_retry_count < max_upload_retries:
+        try:
+            print(f"Uploading audio to Gemini: {_audio_path}... (시도 {upload_retry_count + 1}/{max_upload_retries})")
+            audio_file = genai.upload_file(path=_audio_path)
+            break
+        except Exception as e:
+            upload_retry_count += 1
+            error_str = str(e).lower()
+            # 503 에러나 서버 에러인 경우 재시도
+            if upload_retry_count < max_upload_retries and ('503' in error_str or 'service unavailable' in error_str or 'server error' in error_str):
+                wait_time = min(2 ** upload_retry_count, 10)  # 지수 백오프, 최대 10초
+                logger.warning(f"파일 업로드 실패 (시도 {upload_retry_count}/{max_upload_retries}): {e}. {wait_time}초 후 재시도...")
+                time.sleep(wait_time)
+            else:
+                logger.error(f"오디오 파일 업로드 최종 실패: {e}")
+                return None, None
+    
+    if audio_file is None:
         return None, None
 
     print("Transcribing with Gemini Flash...")
@@ -121,32 +139,61 @@ def process_audio(_audio_path, _model_flash):
         "5. 스크립트 외의 다른 답변은 하지 말아주세요."
     ]
     
-    try:
-        # 타임아웃 500초 설정 (Pro 모델 사용 시 900초 권장)
-        response = _model_flash.generate_content(prompt, request_options={"timeout": 500})
-        
-        full_script_ts = response.text
-        
-        # 'text_only' 스크립트 생성 (요약 모델 입력용)
-        script_text_only = re.sub(r'\[\d{2}:\d{2}\s*-\s*\d{2}:\d{2}\]\s*', '', full_script_ts)
-        
-        if not script_text_only.strip():
-            script_text_only = full_script_ts
-            
-        print("Gemini transcription complete.")
-        return full_script_ts, script_text_only
-
-    except Exception as e:
-        logger.error(f"Gemini STT 처리 중 오류 발생: {e}")
-        genai.delete_file(audio_file.name)
-        return None, None
-    finally:
-        # STT 작업 완료 후 업로드된 파일 삭제 (오류 여부와 관계없이)
+    # STT 처리 재시도 로직
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
         try:
-            print(f"Deleting uploaded audio file: {audio_file.name}")
-            genai.delete_file(audio_file.name)
+            # 타임아웃 500초 설정 (Pro 모델 사용 시 900초 권장)
+            response = _model_flash.generate_content(prompt, request_options={"timeout": 500})
+            
+            full_script_ts = response.text
+            
+            # 'text_only' 스크립트 생성 (요약 모델 입력용)
+            script_text_only = re.sub(r'\[\d{2}:\d{2}\s*-\s*\d{2}:\d{2}\]\s*', '', full_script_ts)
+            
+            if not script_text_only.strip():
+                script_text_only = full_script_ts
+                
+            print("Gemini transcription complete.")
+            
+            # 성공 시 파일 삭제
+            try:
+                print(f"Deleting uploaded audio file: {audio_file.name}")
+                genai.delete_file(audio_file.name)
+            except Exception as e:
+                logger.warning(f"Failed to delete uploaded file {audio_file.name}: {e}")
+            
+            return full_script_ts, script_text_only
+
         except Exception as e:
-            logger.warning(f"Failed to delete uploaded file {audio_file.name}: {e}")
+            retry_count += 1
+            error_str = str(e).lower()
+            error_msg = f"Gemini STT 처리 중 오류 발생 (시도 {retry_count}/{max_retries}): {e}"
+            logger.error(error_msg)
+            
+            # 503 ServiceUnavailable 또는 서버 에러인 경우 재시도
+            if retry_count < max_retries and ('503' in error_str or 'service unavailable' in error_str or 'server error' in error_str or 'rate limit' in error_str):
+                # 재시도 전 대기 (지수 백오프)
+                wait_time = min(2 ** retry_count, 10)  # 최대 10초
+                logger.info(f"503/서버 에러 감지. {wait_time}초 후 재시도합니다...")
+                time.sleep(wait_time)
+            else:
+                # 재시도 불가능한 에러이거나 최대 재시도 횟수 초과
+                logger.error(f"STT 처리 최종 실패: {max_retries}회 재시도 후 포기")
+                try:
+                    genai.delete_file(audio_file.name)
+                except Exception:
+                    pass
+                return None, None
+    
+    # 최대 재시도 횟수 초과
+    try:
+        genai.delete_file(audio_file.name)
+    except Exception:
+        pass
+    return None, None
 
 
 # --- 2. PDF 파싱 (Ollama bakllava 모델 사용) ---
@@ -601,6 +648,7 @@ def get_summary_from_gemini(_model_flash, script_text_with_timestamp):
             
         except Exception as e:
             retry_count += 1
+            error_str = str(e).lower()
             error_msg = f"요약 생성 중 오류 발생 (시도 {retry_count}/{max_retries}): {e}"
             logger.error(error_msg)
             
@@ -608,9 +656,16 @@ def get_summary_from_gemini(_model_flash, script_text_with_timestamp):
                 logger.error(f"요약 생성 최종 실패: {max_retries}회 재시도 후 포기")
                 return None
             
-            # 재시도 전 대기 (지수 백오프)
-            wait_time = min(2 ** retry_count, 10)  # 최대 10초
-            logger.info(f"{wait_time}초 후 재시도합니다...")
+            # 503 ServiceUnavailable 또는 서버 에러인 경우 더 긴 대기 시간
+            if '503' in error_str or 'service unavailable' in error_str or 'server error' in error_str or 'rate limit' in error_str:
+                # 서버 에러인 경우 더 긴 대기 시간 (지수 백오프)
+                wait_time = min(2 ** retry_count, 15)  # 최대 15초 (요약은 더 오래 걸릴 수 있음)
+                logger.info(f"503/서버 에러 감지. {wait_time}초 후 재시도합니다...")
+            else:
+                # JSON 파싱 오류 등은 짧은 대기 시간
+                wait_time = min(2 ** retry_count, 10)  # 최대 10초
+                logger.info(f"{wait_time}초 후 재시도합니다...")
+            
             time.sleep(wait_time)
     
     return None
@@ -692,42 +747,99 @@ def create_semantic_mappings(lecture_id, summary_json, _model_embedding, _chroma
         logger.error(f"Summary JSON 파싱 실패: {e}")
         return []
 
-    for item in tqdm(summary_data.get("summary_list", []), desc="Creating Mappings"):
+    # 모든 요약 항목의 쿼리 텍스트를 미리 준비
+    summary_items = summary_data.get("summary_list", [])
+    query_texts = []
+    item_info = []  # (topic, summary) 튜플 저장
+    
+    for item in summary_items:
         topic = item.get("topic")
         summary = item.get("summary")
         if not topic or not summary:
             continue
-            
         query_text = f"주제: {topic}\n요약: {summary}"
+        query_texts.append(query_text)
+        item_info.append((topic, summary))
+    
+    if not query_texts:
+        return []
+    
+    # 배치로 모든 임베딩을 한 번에 생성 (API 호출 횟수 최소화)
+    try:
+        print(f"Creating embeddings for {len(query_texts)} summary items in batch...")
+        embeddings_response = genai.embed_content(
+            model=_model_embedding,
+            content=query_texts,
+            task_type="retrieval_query"
+        )
+        query_embeddings = embeddings_response['embedding']
         
-        try:
-            query_embedding = genai.embed_content(
-                model=_model_embedding,
-                content=[query_text],
-                task_type="retrieval_query"
-            )['embedding']
-            
-            results = collection.query(
-                query_embeddings=query_embedding,
-                n_results=1,
-                where={"source": "pdf"}
-            )
-            
-            if results["ids"][0]:
-                mapped_doc = results["documents"][0][0]
-                mapped_meta = results["metadatas"][0][0]
-                mapped_page = mapped_meta["page"]
+        # 각 임베딩에 대해 벡터 검색 수행
+        for idx, (topic, summary) in enumerate(tqdm(item_info, desc="Creating Mappings")):
+            try:
+                query_embedding = [query_embeddings[idx]]
                 
-                # DB에 저장할 딕셔너리를 리스트에 추가
-                mappings_to_create.append({
-                    'lecture_id': lecture_id,
-                    'summary_topic': topic,
-                    'mapped_pdf_page': mapped_page,
-                    'mapped_pdf_content': mapped_doc
-                })
+                results = collection.query(
+                    query_embeddings=query_embedding,
+                    n_results=1,
+                    where={"source": "pdf"}
+                )
                 
-        except Exception as e:
-            logger.error(f"Error mapping topic '{topic}': {e}")
+                if results["ids"][0]:
+                    mapped_doc = results["documents"][0][0]
+                    mapped_meta = results["metadatas"][0][0]
+                    mapped_page = mapped_meta["page"]
+                    
+                    # DB에 저장할 딕셔너리를 리스트에 추가
+                    mappings_to_create.append({
+                        'lecture_id': lecture_id,
+                        'summary_topic': topic,
+                        'mapped_pdf_page': mapped_page,
+                        'mapped_pdf_content': mapped_doc
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error mapping topic '{topic}': {e}")
+                
+    except Exception as e:
+        logger.error(f"Error creating batch embeddings for mappings: {e}")
+        # 배치 실패 시 개별 호출로 폴백 (기존 방식)
+        print("Batch embedding failed, falling back to individual calls...")
+        for item in tqdm(summary_items, desc="Creating Mappings (fallback)"):
+            topic = item.get("topic")
+            summary = item.get("summary")
+            if not topic or not summary:
+                continue
+                
+            query_text = f"주제: {topic}\n요약: {summary}"
+            
+            try:
+                query_embedding = genai.embed_content(
+                    model=_model_embedding,
+                    content=[query_text],
+                    task_type="retrieval_query"
+                )['embedding']
+                
+                results = collection.query(
+                    query_embeddings=query_embedding,
+                    n_results=1,
+                    where={"source": "pdf"}
+                )
+                
+                if results["ids"][0]:
+                    mapped_doc = results["documents"][0][0]
+                    mapped_meta = results["metadatas"][0][0]
+                    mapped_page = mapped_meta["page"]
+                    
+                    mappings_to_create.append({
+                        'lecture_id': lecture_id,
+                        'summary_topic': topic,
+                        'mapped_pdf_page': mapped_page,
+                        'mapped_pdf_content': mapped_doc
+                    })
+                    
+            except Exception as e:
+                logger.error(f"Error mapping topic '{topic}': {e}")
             
     print("Semantic mappings complete.")
     return mappings_to_create # Celery 태스크가 이 리스트를 받아 DB에 저장

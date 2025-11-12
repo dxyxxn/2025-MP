@@ -152,8 +152,13 @@ def _embedding_worker(lecture_id, pdf_texts, full_script_ts, model_embedding, ch
     임베딩 작업 함수
     병렬 그룹 2에서 실행됩니다.
     STT 결과(full_script_ts)와 PDF 결과(pdf_texts)가 필요합니다.
+    요약 API 호출과의 병목을 피하기 위해 10초 지연 후 시작합니다.
     """
     try:
+        # 요약 API 호출과의 병목을 피하기 위해 10초 대기 (시간 측정 전)
+        print(f"[Embedding Worker] 요약 시작 후 10초 대기 중...")
+        time.sleep(10)
+        
         print(f"[Embedding Worker] 시작...")
         embed_start_time = time.time()
         
@@ -400,9 +405,6 @@ def process_lecture_task(self, lecture_id):
         Lecture.objects.filter(id=lecture_id).update(step_times=step_times)
         print(f"5/6: 매핑 완료 (소요 시간: {mapping_elapsed_sec:.2f}초)")
         
-        # PDF 처리 시간 = 파싱 + 임베딩 + 매핑
-        pdf_processing_elapsed_sec = pdf_parse_elapsed_sec + embed_elapsed_sec + mapping_elapsed_sec
-        
         # 6. 데이터 저장
         print("6/6: 데이터 저장 시작...")
         Lecture.objects.filter(id=lecture_id).update(current_step=6)
@@ -459,22 +461,18 @@ def process_lecture_task(self, lecture_id):
                 # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 50%, 새 50%)
                 stats.embedding_avg_sec_per_page = stats.embedding_avg_sec_per_page * 0.5 + embedding_sec_per_page * 0.5
             
-            # PDF 처리 평균 업데이트 (하위 호환성 유지: 파싱+임베딩+매핑)
-            if pdf_page_count > 0:
-                pdf_sec_per_page = pdf_processing_elapsed_sec / pdf_page_count
+            # 요약 평균 업데이트 (1분당 초)
+            if audio_duration_min > 0:
+                summary_sec_per_min = summary_elapsed_sec / audio_duration_min
                 # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 50%, 새 50%)
-                stats.pdf_processing_avg_sec_per_page = stats.pdf_processing_avg_sec_per_page * 0.5 + pdf_sec_per_page * 0.5
-            
-            # 요약 평균 업데이트 (고정값)
-            # 이동 평균: 기존 평균과 새 값의 가중 평균 (기존 50%, 새 50%)
-            stats.summary_avg_sec = stats.summary_avg_sec * 0.5 + summary_elapsed_sec * 0.5
+                stats.summary_avg_sec_per_min = stats.summary_avg_sec_per_min * 0.5 + summary_sec_per_min * 0.5
             
             stats.save()
             print(f"ProcessingStats 업데이트 완료:")
             print(f"  - STT: {stats.audio_stt_avg_sec_per_min:.2f}초/분")
             print(f"  - PDF 파싱: {stats.pdf_parsing_avg_sec_per_page:.2f}초/페이지")
             print(f"  - 임베딩: {stats.embedding_avg_sec_per_page:.2f}초/페이지")
-            print(f"  - 요약: {stats.summary_avg_sec:.2f}초")
+            print(f"  - 요약: {stats.summary_avg_sec_per_min:.2f}초/분")
         except Exception as e:
             print(f"ProcessingStats 업데이트 실패: {e}")
 
@@ -528,16 +526,14 @@ def calculate_etr_task(lecture_id):
         group1_estimated_sec = max(stt_estimated_sec, pdf_parsing_estimated_sec)
         
         # 병렬 그룹 2: 요약과 임베딩 중 긴 시간
-        summary_estimated_sec = stats.summary_avg_sec
+        summary_estimated_sec = audio_duration_min * stats.summary_avg_sec_per_min
         embedding_estimated_sec = pdf_page_count * stats.embedding_avg_sec_per_page
         group2_estimated_sec = max(summary_estimated_sec, embedding_estimated_sec)
         
-        # 순차 처리: 매핑 시간 (PDF 처리 평균에서 파싱과 임베딩을 제외한 나머지로 추정)
-        # 매핑 시간 = (PDF 처리 평균 - PDF 파싱 평균 - 임베딩 평균) * 페이지 수
-        mapping_avg_sec_per_page = max(0, stats.pdf_processing_avg_sec_per_page - 
-                                       stats.pdf_parsing_avg_sec_per_page - 
-                                       stats.embedding_avg_sec_per_page)
-        mapping_estimated_sec = pdf_page_count * mapping_avg_sec_per_page
+        # 순차 처리: 매핑 시간 (고정값으로 추정)
+        # 매핑 시간은 페이지당 평균 0.1초로 추정 (실제로는 페이지 수와 요약 항목 수에 비례하지만 간단히 고정값 사용)
+        mapping_estimated_sec_per_page = 0.1
+        mapping_estimated_sec = pdf_page_count * mapping_estimated_sec_per_page
         # 저장 시간은 매우 짧으므로 고정값으로 추정 (예: 5초)
         save_estimated_sec = 5.0
         sequential_estimated_sec = mapping_estimated_sec + save_estimated_sec
@@ -550,9 +546,9 @@ def calculate_etr_task(lecture_id):
         lecture.save()
         
         print(f"ETR 계산 완료: {estimated_time_sec:.0f}초")
-        print(f"  - 병렬 그룹 1 (STT vs PDF 파싱): {group1_estimated_sec:.0f}초 (STT: {stt_estimated_sec:.0f}초, PDF 파싱: {pdf_parsing_estimated_sec:.0f}초)")
-        print(f"  - 병렬 그룹 2 (요약 vs 임베딩): {group2_estimated_sec:.0f}초 (요약: {summary_estimated_sec:.0f}초, 임베딩: {embedding_estimated_sec:.0f}초)")
-        print(f"  - 순차 처리 (매핑+저장): {sequential_estimated_sec:.0f}초")
+        print(f" 병렬 그룹 1 : {group1_estimated_sec:.0f}초 (STT: {stt_estimated_sec:.0f}초, PDF 파싱: {pdf_parsing_estimated_sec:.0f}초)")
+        print(f" 병렬 그룹 2 : {group2_estimated_sec:.0f}초 (요약: {summary_estimated_sec:.0f}초, 임베딩: {embedding_estimated_sec:.0f}초)")
+        print(f" 순차 처리 : {sequential_estimated_sec:.0f}초")
         print(f"  (오디오: {audio_duration_min:.1f}분, PDF: {pdf_page_count}페이지)")
         
     except Exception as e:

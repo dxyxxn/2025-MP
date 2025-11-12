@@ -21,12 +21,10 @@ class CustomUser(AbstractUser):
     - email: VARCHAR(254) (회원가입에서 입력받는 이메일)
     - password: VARCHAR(128) (해시된 비밀번호)
     - is_active: BOOLEAN (계정 활성화 여부, 인증 로직에서 사용)
-    - is_staff: BOOLEAN (관리자 접근 권한 플래그)
+    - is_staff: BOOLEAN (관리자 접근 권한 플래그, 관리자 페이지 접근 권한)
     - last_login: DATETIME (Django 인증 프레임워크가 로그인 시 자동 갱신)
     - date_joined: DATETIME (가입 일시)
     """
-    # AbstractUser가 이미 모든 필드를 포함하므로 추가 필드 정의 불필요
-    # 필요시 여기에 추가 필드를 정의할 수 있습니다.
     
     class Meta:
         verbose_name = _('사용자')
@@ -134,40 +132,37 @@ class ProcessingStats(models.Model):
     컬럼:
     - id: INTEGER (PK, 자동 생성) - 항상 1로 고정 (싱글톤)
     - audio_stt_avg_sec_per_min: FLOAT - 1분의 오디오를 STT 처리하는 데 걸리는 평균 시간(초)
-      예: 10.0이면 1분 오디오 처리에 평균 10초 소요
-    - pdf_processing_avg_sec_per_page: FLOAT - 1페이지의 PDF를 처리(파싱+임베딩+매핑)하는 데 걸리는 평균 시간(초)
-      예: 2.0이면 1페이지 PDF 처리에 평균 2초 소요
-    - summary_avg_sec: FLOAT - 요약 작업에 걸리는 평균 시간(초)
-      예: 30.0이면 요약 생성에 평균 30초 소요
+      예: 2.0이면 1분 오디오 처리에 평균 2초 소요
+    - pdf_parsing_avg_sec_per_page: FLOAT - 1페이지의 PDF를 파싱하는 데 걸리는 평균 시간(초)
+      예: 1.6이면 1페이지 PDF 파싱에 평균 1.6초 소요
+    - embedding_avg_sec_per_page: FLOAT - 1페이지의 PDF를 임베딩하는 데 걸리는 평균 시간(초)
+      예: 0.07이면 1페이지 PDF 임베딩에 평균 0.07초 소요
+    - summary_avg_sec_per_min: FLOAT - 1분의 오디오를 요약하는 데 걸리는 평균 시간(초)
+      예: 1.0이면 1분 오디오 요약에 평균 1초 소요
     - updated_at: DATETIME - 마지막 업데이트 일시 (자동 업데이트)
     
     사용 예시:
     - ETR 계산 (병렬 처리 구조):
       * 병렬 그룹 1: max(오디오_길이_분 * audio_stt_avg_sec_per_min, PDF_페이지_수 * pdf_parsing_avg_sec_per_page)
-      * 병렬 그룹 2: max(summary_avg_sec, PDF_페이지_수 * embedding_avg_sec_per_page)
+      * 병렬 그룹 2: max(오디오_길이_분 * summary_avg_sec_per_min, PDF_페이지_수 * embedding_avg_sec_per_page)
       * 순차 처리: 매핑 시간 (고정값 또는 추정)
       * 총 예상 시간 = 그룹1 + 그룹2 + 순차 처리
     """
     # 1분의 오디오를 STT 처리하는 데 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
-    audio_stt_avg_sec_per_min = models.FloatField(default=10.0, verbose_name="오디오 STT 평균(초/분)")
-    
-    # 1페이지의 PDF를 처리(파싱+임베딩+매핑)하는 데 걸리는 평균 시간(초)
-    # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
-    # (하위 호환성을 위해 유지, 병렬 처리에서는 pdf_parsing과 embedding을 사용)
-    pdf_processing_avg_sec_per_page = models.FloatField(default=2.0, verbose_name="PDF 처리 평균(초/페이지)")
+    audio_stt_avg_sec_per_min = models.FloatField(default=2.0, verbose_name="오디오 STT 평균(초/분)")
     
     # 1페이지의 PDF를 파싱하는 데 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
-    pdf_parsing_avg_sec_per_page = models.FloatField(default=0.8, verbose_name="PDF 파싱 평균(초/페이지)")
+    pdf_parsing_avg_sec_per_page = models.FloatField(default=1.6, verbose_name="PDF 파싱 평균(초/페이지)")
     
     # 1페이지의 PDF를 임베딩하는 데 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
-    embedding_avg_sec_per_page = models.FloatField(default=0.8, verbose_name="임베딩 평균(초/페이지)")
+    embedding_avg_sec_per_page = models.FloatField(default=0.07, verbose_name="임베딩 평균(초/페이지)")
     
-    # 요약 작업에 걸리는 평균 시간(초)
+    # 1분의 오디오를 요약하는 데 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
-    summary_avg_sec = models.FloatField(default=30.0, verbose_name="요약 평균(초)")
+    summary_avg_sec_per_min = models.FloatField(default=1.0, verbose_name="요약 평균(초/분)")
     
     updated_at = models.DateTimeField(auto_now=True, verbose_name="업데이트 일시")
     

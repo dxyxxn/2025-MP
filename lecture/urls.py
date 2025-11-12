@@ -7,6 +7,9 @@ urlpatterns = [
     path('signup/', views.signup_view, name='signup'),
     path('logout/', views.logout_view, name='logout'),
     
+    # 관리자 페이지
+    path('admin-dashboard/', views.admin_dashboard_view, name='admin_dashboard'),
+    
     # 1. 업로드 페이지 (Streamlit의 upload_view)
     path('', views.upload_view, name='upload'),
     

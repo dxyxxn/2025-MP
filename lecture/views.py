@@ -3,11 +3,12 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login, authenticate, logout, get_user_model
 from django.contrib.auth.decorators import login_required
-from django.db import IntegrityError
+from django.db import IntegrityError, connection, models
 from django.conf import settings
 from django.contrib import messages
+from django.apps import apps
 import os
-from .models import Lecture, ProcessingStats
+from .models import Lecture, ProcessingStats, CustomUser, PdfChunk, Mapping
 from .tasks import process_lecture_task, calculate_etr_task, start_process_from_url_task # Celery 태스크 임포트
 from .services import init_gemini_models, init_chromadb_client, get_rag_response
 import json
@@ -15,6 +16,9 @@ import json
 # 로그인 페이지
 def login_view(request):
     if request.user.is_authenticated:
+        # is_staff이면 관리자 페이지로, 아니면 upload 페이지로
+        if request.user.is_staff:
+            return redirect('admin_dashboard')
         return redirect('upload')
     
     if request.method == 'POST':
@@ -25,6 +29,9 @@ def login_view(request):
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
+                # is_staff이면 관리자 페이지로, 아니면 upload 페이지로
+                if user.is_staff:
+                    return redirect('admin_dashboard')
                 return redirect('upload')
             else:
                 messages.error(request, '아이디 또는 비밀번호가 올바르지 않습니다.')
@@ -288,3 +295,83 @@ def api_lecture_status_view(request, lecture_id):
         'step_time': step_time,  # 현재 단계의 소요 시간
         'youtube_url': lecture.youtube_url if lecture.youtube_url else None  # YouTube URL 여부 확인용
     })
+
+# 관리자 페이지
+@login_required
+def admin_dashboard_view(request):
+    # is_staff 체크
+    if not request.user.is_staff:
+        messages.error(request, '관리자 권한이 필요합니다.')
+        return redirect('upload')
+    
+    # ProcessingStats 통계 가져오기
+    try:
+        processing_stats = ProcessingStats.get_or_create_singleton()
+    except Exception:
+        processing_stats = None
+    
+    # 데이터베이스 테이블 정보 가져오기 (models.py에 정의된 모델만)
+    table_info = []
+    try:
+        # lecture 앱의 모든 모델 가져오기
+        lecture_app = apps.get_app_config('lecture')
+        lecture_models = lecture_app.get_models()
+        
+        # 각 모델에서 실제 사용하는 필드 정의
+        # CustomUser: docstring에 명시된 필드만 (is_superuser, first_name, last_name 등 제외)
+        custom_user_used_fields = {'id', 'username', 'email', 'password', 'is_active', 'is_staff', 'last_login', 'date_joined'}
+        
+        with connection.cursor() as cursor:
+            # 모델 기준으로 순회 (모델 이름 우선)
+            for model in sorted(lecture_models, key=lambda m: m.__name__):
+                table_name = model._meta.db_table
+                try:
+                    # 테이블의 컬럼 정보 가져오기
+                    cursor.execute(f"PRAGMA table_info({table_name})")
+                    columns = cursor.fetchall()
+                    all_column_names = [col[1] for col in columns]  # col[1]이 컬럼 이름
+                    
+                    # 모델에서 실제 사용하는 필드만 필터링
+                    if model.__name__ == 'CustomUser':
+                        # CustomUser의 경우 docstring에 명시된 필드만 사용
+                        column_names = [col for col in all_column_names if col in custom_user_used_fields]
+                    else:
+                        # 다른 모델의 경우 모델에 정의된 필드만 사용
+                        # Django 모델의 실제 필드 컬럼 이름 가져오기
+                        model_column_names = set()
+                        for field in model._meta.get_fields():
+                            if isinstance(field, models.Field):
+                                # 일반 필드는 column 속성 사용
+                                if hasattr(field, 'column'):
+                                    model_column_names.add(field.column)
+                            elif hasattr(field, 'name') and hasattr(field, 'related_model'):
+                                # ForeignKey 필드는 {field_name}_id로 저장됨
+                                model_column_names.add(f'{field.name}_id')
+                        
+                        # id는 항상 포함
+                        model_column_names.add('id')
+                        column_names = [col for col in all_column_names if col in model_column_names]
+                    
+                    # 테이블의 튜플 수 가져오기
+                    cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                    row_count = cursor.fetchone()[0]
+                    
+                    table_info.append({
+                        'name': table_name,
+                        'model_name': model.__name__,
+                        'columns': column_names,
+                        'row_count': row_count
+                    })
+                except Exception as e:
+                    # 특정 테이블 조회 실패 시 건너뛰기
+                    continue
+    except Exception as e:
+        messages.error(request, f'데이터베이스 정보를 가져오는 중 오류가 발생했습니다: {str(e)}')
+        table_info = []
+    
+    context = {
+        'processing_stats': processing_stats,
+        'table_info': table_info,
+    }
+    
+    return render(request, 'lecture/admin_dashboard.html', context)

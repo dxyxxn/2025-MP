@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LectureAI - 관리자 대시보드</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .stat-card {
+            transition: transform 0.2s;
+        }
+        .stat-card:hover {
+            transform: translateY(-5px);
+        }
+        .table-info-card {
+            margin-bottom: 1.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid mt-4">
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1 class="mb-0">
+                        <i class="bi bi-shield-check text-primary"></i> 관리자 대시보드
+                    </h1>
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="text-muted">
+                            <i class="bi bi-person-circle"></i> {{ user.username }}
+                        </span>
+                        <a href="{% url 'upload' %}" class="btn btn-outline-primary btn-sm">
+                            <i class="bi bi-arrow-left"></i> 업로드 페이지로
+                        </a>
+                        <a href="{% url 'logout' %}" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-box-arrow-right"></i> 로그아웃
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- ProcessingStats 통계 섹션 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-primary text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="bi bi-graph-up"></i> 처리 통계 (ProcessingStats)
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        {% if processing_stats %}
+                            <div class="row g-3">
+                                <div class="col-md-3">
+                                    <div class="card stat-card border-primary">
+                                        <div class="card-body text-center">
+                                            <h5 class="card-title text-primary">
+                                                <i class="bi bi-mic"></i> STT 평균
+                                            </h5>
+                                            <h2 class="text-primary">{{ processing_stats.audio_stt_avg_sec_per_min|floatformat:2 }}</h2>
+                                            <p class="text-muted mb-0">초/분</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card stat-card border-success">
+                                        <div class="card-body text-center">
+                                            <h5 class="card-title text-success">
+                                                <i class="bi bi-file-earmark-pdf"></i> PDF 파싱 평균
+                                            </h5>
+                                            <h2 class="text-success">{{ processing_stats.pdf_parsing_avg_sec_per_page|floatformat:2 }}</h2>
+                                            <p class="text-muted mb-0">초/페이지</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card stat-card border-info">
+                                        <div class="card-body text-center">
+                                            <h5 class="card-title text-info">
+                                                <i class="bi bi-code-square"></i> 임베딩 평균
+                                            </h5>
+                                            <h2 class="text-info">{{ processing_stats.embedding_avg_sec_per_page|floatformat:2 }}</h2>
+                                            <p class="text-muted mb-0">초/페이지</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-3">
+                                    <div class="card stat-card border-warning">
+                                        <div class="card-body text-center">
+                                            <h5 class="card-title text-warning">
+                                                <i class="bi bi-file-text"></i> 요약 평균
+                                            </h5>
+                                            <h2 class="text-warning">{{ processing_stats.summary_avg_sec_per_min|floatformat:2 }}</h2>
+                                            <p class="text-muted mb-0">초/분</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-12">
+                                    <div class="d-flex justify-content-end">
+                                        <p class="text-muted mb-0">
+                                            <i class="bi bi-clock-history"></i> 마지막 업데이트: 
+                                            {{ processing_stats.updated_at|date:"Y-m-d H:i:s" }}
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 처리 통계 데이터가 없습니다.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 데이터베이스 테이블 정보 섹션 -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header bg-secondary text-white">
+                        <h3 class="card-title mb-0">
+                            <i class="bi bi-database"></i> 데이터베이스 테이블 정보
+                        </h3>
+                    </div>
+                    <div class="card-body">
+                        {% if table_info %}
+                            <div class="row">
+                                {% for table in table_info %}
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card table-info-card border">
+                                            <div class="card-header bg-light">
+                                                <h5 class="card-title mb-0">
+                                                    <i class="bi bi-table"></i> 
+                                                    {% if table.model_name %}
+                                                        {{ table.model_name }}
+                                                        <small class="text-muted">({{ table.name }})</small>
+                                                    {% else %}
+                                                        {{ table.name }}
+                                                    {% endif %}
+                                                </h5>
+                                            </div>
+                                            <div class="card-body">
+                                                <p class="mb-2">
+                                                    <strong><i class="bi bi-list-ol"></i> 튜플 수:</strong> 
+                                                    <span class="badge bg-primary">{{ table.row_count }}</span>
+                                                </p>
+                                                <p class="mb-2"><strong><i class="bi bi-columns"></i> 컬럼:</strong></p>
+                                                <div class="d-flex flex-wrap gap-1">
+                                                    {% for column in table.columns %}
+                                                        <span class="badge bg-secondary">{{ column }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="alert alert-warning">
+                                <i class="bi bi-exclamation-triangle"></i> 테이블 정보를 가져올 수 없습니다.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap 5 JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
+
