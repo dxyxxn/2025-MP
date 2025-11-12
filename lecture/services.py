@@ -433,6 +433,78 @@ def process_pdf(_pdf_path, ollama_client=None):
         return []
 
 # --- 3. 요약 및 구조화 (Gemini Flash) ---
+def _extract_json_from_response(response_text):
+    """
+    응답 텍스트에서 JSON 부분을 추출합니다.
+    마크다운 코드 블록, 앞뒤 설명 텍스트 등을 처리합니다.
+    """
+    if not response_text:
+        return None
+    
+    # 1. 마크다운 코드 블록에서 JSON 추출 시도
+    # ```json ... ``` 형식
+    json_block_pattern = r'```(?:json)?\s*\n?(.*?)\n?```'
+    match = re.search(json_block_pattern, response_text, re.DOTALL)
+    if match:
+        return match.group(1).strip()
+    
+    # 2. { 로 시작하고 } 로 끝나는 JSON 객체 찾기
+    # 첫 번째 { 부터 마지막 } 까지
+    start_idx = response_text.find('{')
+    end_idx = response_text.rfind('}')
+    
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        json_candidate = response_text[start_idx:end_idx + 1]
+        # 간단한 유효성 검사: 중괄호 균형 확인
+        if json_candidate.count('{') == json_candidate.count('}'):
+            return json_candidate.strip()
+    
+    # 3. 전체 텍스트가 JSON일 가능성
+    # 앞뒤 공백만 제거하고 시도
+    return response_text.strip()
+
+
+def _try_fix_json(json_str):
+    """
+    불완전하거나 손상된 JSON을 복구하려고 시도합니다.
+    복구 불가능하면 None을 반환합니다.
+    """
+    if not json_str:
+        return None
+    
+    try:
+        # 1. 트림 및 정리
+        json_str = json_str.strip()
+        
+        # 2. 마지막 중괄호나 대괄호가 누락된 경우 추가
+        open_braces = json_str.count('{')
+        close_braces = json_str.count('}')
+        open_brackets = json_str.count('[')
+        close_brackets = json_str.count(']')
+        
+        # 3. 불완전한 문자열 리터럴 수정 시도 (단순한 경우만)
+        # 큰따옴표로 시작했지만 닫히지 않은 경우
+        if json_str.count('"') % 2 != 0:
+            # 마지막 따옴표가 없는 경우 추가 (단순한 휴리스틱)
+            if json_str.rstrip().endswith('"'):
+                pass  # 이미 닫혀있음
+            else:
+                # 복잡한 경우이므로 복구 포기
+                return None
+        
+        # 4. 닫는 중괄호/대괄호 추가
+        if close_braces < open_braces:
+            json_str += '\n' + '}' * (open_braces - close_braces)
+        if close_brackets < open_brackets:
+            json_str += ']' * (open_brackets - close_brackets)
+        
+        return json_str
+        
+    except Exception as e:
+        logger.debug(f"JSON 복구 시도 실패: {e}")
+        return None
+
+
 def get_summary_from_gemini(_model_flash, script_text_with_timestamp):
     print("Generating summary with Gemini Flash...")
     
@@ -467,20 +539,81 @@ def get_summary_from_gemini(_model_flash, script_text_with_timestamp):
       ]
     }}
 
-    반드시 유효한 JSON 객체만 응답해 주세요.
+    반드시 유효한 JSON 객체만 응답해 주세요. 응답에는 JSON 이외의 다른 텍스트를 포함하지 마세요.
     타임스탬프는 스크립트에서 해당 소주제가 시작되는 부분의 [MM:SS] 형식 타임스탬프를 찾아서 포함해 주세요.
     """
     
-    try:
-        # 타임아웃 500초 설정 (STT와 동일, Pro 모델 사용 시 900초 권장)
-        response = _model_flash.generate_content(prompt, request_options={"timeout": 500})
-        json_str = response.text.strip().lstrip("```json").rstrip("```")
-        summary_data = json.loads(json_str)
-        print("Summary generation complete.")
-        return json.dumps(summary_data, indent=2) # JSON 문자열로 반환
-    except Exception as e:
-        logger.error(f"요약 생성 중 오류 발생: {e}")
-        return None
+    max_retries = 3
+    retry_count = 0
+    
+    while retry_count < max_retries:
+        try:
+            # 타임아웃 500초 설정 (STT와 동일, Pro 모델 사용 시 900초 권장)
+            response = _model_flash.generate_content(prompt, request_options={"timeout": 500})
+            response_text = response.text.strip()
+            
+            # JSON 응답 추출 (마크다운 코드 블록 제거)
+            json_str = _extract_json_from_response(response_text)
+            
+            if not json_str:
+                raise ValueError("응답에서 JSON을 추출할 수 없습니다.")
+            
+            # JSON 파싱
+            try:
+                summary_data = json.loads(json_str)
+            except json.JSONDecodeError as e:
+                error_msg = f"JSON 파싱 실패 (라인 {e.lineno}, 컬럼 {e.colno}): {e.msg}"
+                logger.error(f"{error_msg}\n응답 일부: {response_text[:500]}")
+                
+                # JSON 복구 시도 (불완전한 JSON의 경우)
+                json_str_fixed = _try_fix_json(json_str)
+                if json_str_fixed:
+                    try:
+                        summary_data = json.loads(json_str_fixed)
+                        logger.info("JSON 복구 성공")
+                    except json.JSONDecodeError:
+                        raise ValueError(f"JSON 파싱 및 복구 실패: {error_msg}")
+                else:
+                    raise ValueError(f"JSON 파싱 실패: {error_msg}")
+            
+            # JSON 구조 검증
+            if not isinstance(summary_data, dict):
+                raise ValueError(f"예상된 JSON 객체 형식이 아닙니다. 타입: {type(summary_data)}")
+            
+            if "summary_list" not in summary_data:
+                raise ValueError("JSON에 'summary_list' 키가 없습니다.")
+            
+            if not isinstance(summary_data["summary_list"], list):
+                raise ValueError(f"'summary_list'가 리스트 형식이 아닙니다. 타입: {type(summary_data['summary_list'])}")
+            
+            # 각 항목의 필수 필드 검증
+            for idx, item in enumerate(summary_data["summary_list"]):
+                if not isinstance(item, dict):
+                    raise ValueError(f"summary_list[{idx}]가 딕셔너리 형식이 아닙니다.")
+                required_fields = ["topic", "summary", "original_segment", "timestamp"]
+                for field in required_fields:
+                    if field not in item:
+                        logger.warning(f"summary_list[{idx}]에 '{field}' 필드가 없습니다. 기본값으로 채웁니다.")
+                        item[field] = "" if field != "timestamp" else "[00:00]"
+            
+            print(f"Summary generation complete. {len(summary_data['summary_list'])}개의 소주제가 생성되었습니다.")
+            return json.dumps(summary_data, ensure_ascii=False, indent=2)
+            
+        except Exception as e:
+            retry_count += 1
+            error_msg = f"요약 생성 중 오류 발생 (시도 {retry_count}/{max_retries}): {e}"
+            logger.error(error_msg)
+            
+            if retry_count >= max_retries:
+                logger.error(f"요약 생성 최종 실패: {max_retries}회 재시도 후 포기")
+                return None
+            
+            # 재시도 전 대기 (지수 백오프)
+            wait_time = min(2 ** retry_count, 10)  # 최대 10초
+            logger.info(f"{wait_time}초 후 재시도합니다...")
+            time.sleep(wait_time)
+    
+    return None
 
 # --- 4. 임베딩 및 벡터 DB 저장 ---
 def embed_and_store(lecture_id, pdf_texts, script_text, _model_embedding, _chroma_client):
