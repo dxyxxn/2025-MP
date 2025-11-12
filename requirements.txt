@@ -4,28 +4,28 @@ Django==5.2.7
 # Environment variables management
 django-environ==0.11.2
 
-# Google Gemini API
+# Google Gemini API (STT, 요약, 임베딩)
 google-generativeai>=0.3.0
 
-# PDF processing
+# PDF processing (텍스트 추출)
 PyMuPDF>=1.23.0
 
-# Vector database
+# Vector database (의미 기반 검색)
 chromadb>=0.4.0
 
-# Progress bar
+# Progress bar (PDF 처리 진행률 표시)
 tqdm>=4.66.0
 
-# Celery for asynchronous tasks
+# Celery for asynchronous tasks (병렬 처리 지원)
 celery>=5.3.0
 
 # Redis for Celery broker and result backend
 redis>=5.0.0
 
-# Audio file processing
+# Audio file processing (오디오 길이 측정)
 mutagen>=1.47.0
 pydub>=0.25.1
 
-# Ollama for local LLM
+# Ollama for local LLM (PDF 이미지 분석, 타임아웃 및 재시도 지원)
 ollama>=0.1.0
 

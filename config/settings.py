@@ -160,3 +160,5 @@ LOGOUT_REDIRECT_URL = '/login/'
 OLLAMA_BASE_URL = env('OLLAMA_BASE_URL', default='http://localhost:11434')
 OLLAMA_MODEL = env('OLLAMA_MODEL', default='bakllava')  # bakllava 또는 llava
 OLLAMA_BATCH_SIZE = int(env('OLLAMA_BATCH_SIZE', default='4'))  # 배치 크기 (병렬 처리)
+OLLAMA_TIMEOUT = int(env('OLLAMA_TIMEOUT', default='30'))  # Ollama 요청 타임아웃 (초)
+OLLAMA_MAX_RETRIES = int(env('OLLAMA_MAX_RETRIES', default='2'))  # 최대 재시도 횟수

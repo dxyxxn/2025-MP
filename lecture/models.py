@@ -137,8 +137,11 @@ class ProcessingStats(models.Model):
     - updated_at: DATETIME - 마지막 업데이트 일시 (자동 업데이트)
     
     사용 예시:
-    - ETR 계산: estimated_time_sec = (오디오_길이_분 * audio_stt_avg_sec_per_min) + 
-                (PDF_페이지_수 * pdf_processing_avg_sec_per_page) + summary_avg_sec
+    - ETR 계산 (병렬 처리 구조):
+      * 병렬 그룹 1: max(오디오_길이_분 * audio_stt_avg_sec_per_min, PDF_페이지_수 * pdf_parsing_avg_sec_per_page)
+      * 병렬 그룹 2: max(summary_avg_sec, PDF_페이지_수 * embedding_avg_sec_per_page)
+      * 순차 처리: 매핑 시간 (고정값 또는 추정)
+      * 총 예상 시간 = 그룹1 + 그룹2 + 순차 처리
     """
     # 1분의 오디오를 STT 처리하는 데 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
@@ -146,7 +149,16 @@ class ProcessingStats(models.Model):
     
     # 1페이지의 PDF를 처리(파싱+임베딩+매핑)하는 데 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
+    # (하위 호환성을 위해 유지, 병렬 처리에서는 pdf_parsing과 embedding을 사용)
     pdf_processing_avg_sec_per_page = models.FloatField(default=2.0, verbose_name="PDF 처리 평균(초/페이지)")
+    
+    # 1페이지의 PDF를 파싱하는 데 걸리는 평균 시간(초)
+    # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
+    pdf_parsing_avg_sec_per_page = models.FloatField(default=0.8, verbose_name="PDF 파싱 평균(초/페이지)")
+    
+    # 1페이지의 PDF를 임베딩하는 데 걸리는 평균 시간(초)
+    # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
+    embedding_avg_sec_per_page = models.FloatField(default=0.8, verbose_name="임베딩 평균(초/페이지)")
     
     # 요약 작업에 걸리는 평균 시간(초)
     # process_lecture_task 완료 시 이동 평균 방식으로 업데이트됨
