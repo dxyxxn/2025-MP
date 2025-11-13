@@ -8,7 +8,8 @@ import chromadb
 import ollama
 import base64
 import io
-from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FutureTimeoutError
 from tqdm import tqdm
 from django.conf import settings
 
@@ -231,8 +232,18 @@ def extract_images_from_page(page, pdf_doc):
         logger.warning(f"페이지 이미지 목록 가져오기 실패: {e}")
     return images
 
-def process_single_page_with_ollama(page_num, page, pdf_doc, ollama_client):
-    """단일 PDF 페이지 처리: 텍스트 추출 + 이미지 분석 (test_bakllava_pdf.py와 동일한 방식)"""
+def process_single_page_with_ollama(page_num, page, pdf_doc, ollama_client, page_timeout=None):
+    """단일 PDF 페이지 처리: 텍스트 추출 + 이미지 분석 (test_bakllava_pdf.py와 동일한 방식)
+    
+    Args:
+        page_num: 페이지 번호 (0-based)
+        page: PyMuPDF 페이지 객체
+        pdf_doc: PyMuPDF 문서 객체
+        ollama_client: Ollama 클라이언트
+        page_timeout: 페이지 전체 처리 타임아웃 (초). None이면 타임아웃 없음
+    """
+    page_start_time = time.time()
+    
     try:
         # 1. PyMuPDF로 텍스트 추출 (정확하고 빠름)
         page_text = page.get_text("text").strip()
@@ -247,55 +258,93 @@ def process_single_page_with_ollama(page_num, page, pdf_doc, ollama_client):
             max_retries = settings.OLLAMA_MAX_RETRIES
             
             # 각 이미지 분석을 별도 함수로 분리하여 타임아웃 적용
-            def analyze_single_image(img_info):
-                """단일 이미지 분석 (타임아웃 적용)"""
-                try:
-                    response = ollama_client.generate(
-                        model=settings.OLLAMA_MODEL,
-                        prompt=IMAGE_DESCRIPTION_PROMPT,
-                        images=[img_info['base64']],
-                        options={
-                            'temperature': 0.1,
-                        }
-                    )
-                    
-                    if hasattr(response, 'response'):
-                        img_description = response.response.strip()
-                    elif isinstance(response, dict):
-                        img_description = response.get('response', '').strip()
-                    else:
-                        img_description = str(response).strip()
-                    
-                    return img_description if img_description else None
-                except Exception as e:
-                    raise Exception(f"이미지 분석 중 오류: {str(e)}")
+            def analyze_single_image_with_timeout(img_info, timeout_sec):
+                """단일 이미지 분석 (강제 타임아웃 적용)"""
+                result_container = {'response': None, 'error': None}
+                
+                def call_ollama():
+                    """Ollama API 호출 (별도 스레드에서 실행)"""
+                    try:
+                        response = ollama_client.generate(
+                            model=settings.OLLAMA_MODEL,
+                            prompt=IMAGE_DESCRIPTION_PROMPT,
+                            images=[img_info['base64']],
+                            options={
+                                'temperature': 0.1,
+                            }
+                        )
+                        
+                        if hasattr(response, 'response'):
+                            result_container['response'] = response.response.strip()
+                        elif isinstance(response, dict):
+                            result_container['response'] = response.get('response', '').strip()
+                        else:
+                            result_container['response'] = str(response).strip()
+                    except Exception as e:
+                        result_container['error'] = str(e)
+                
+                # 별도 스레드에서 Ollama 호출 실행
+                thread = threading.Thread(target=call_ollama, daemon=True)
+                thread.start()
+                thread.join(timeout=timeout_sec)
+                
+                # 타임아웃 체크
+                if thread.is_alive():
+                    raise TimeoutError(f"이미지 분석이 {timeout_sec}초 내에 완료되지 않았습니다 (타임아웃)")
+                
+                # 에러 체크
+                if result_container['error']:
+                    raise Exception(f"이미지 분석 중 오류: {result_container['error']}")
+                
+                # 응답 체크
+                if not result_container['response']:
+                    raise Exception("빈 응답을 받았습니다")
+                
+                return result_container['response']
             
             # 각 이미지에 대해 재시도 로직 적용
             for img_info in page_images:
+                # 페이지 전체 타임아웃 체크
+                if page_timeout and (time.time() - page_start_time) >= page_timeout:
+                    logger.warning(f"페이지 {page_num + 1} 처리 타임아웃 ({page_timeout}초 초과). 남은 이미지 분석 건너뜀")
+                    break
+                
                 retry_count = 0
                 success = False
                 img_description = None
                 
                 while retry_count <= max_retries and not success:
+                    # 페이지 전체 타임아웃 체크 (재시도 루프 내에서도)
+                    if page_timeout and (time.time() - page_start_time) >= page_timeout:
+                        logger.warning(f"페이지 {page_num + 1} 처리 타임아웃 ({page_timeout}초 초과). 이미지 {img_info['index'] + 1} 분석 건너뜀")
+                        image_descriptions.append(f"[Image {img_info['index'] + 1}]: Timeout - 페이지 처리 시간 초과")
+                        success = True  # 포기하고 다음 이미지로
+                        break
+                    
                     try:
-                        # ThreadPoolExecutor를 사용하여 타임아웃 적용
-                        with ThreadPoolExecutor(max_workers=1) as executor:
-                            future = executor.submit(analyze_single_image, img_info)
-                            try:
-                                img_description = future.result(timeout=timeout)
-                                if img_description:
-                                    image_descriptions.append(f"[Image {img_info['index'] + 1}]: {img_description}")
-                                    success = True
-                                else:
-                                    raise Exception("빈 응답을 받았습니다")
-                            except TimeoutError:
-                                raise TimeoutError(f"이미지 분석이 {timeout}초 내에 완료되지 않았습니다")
-                    except (TimeoutError, Exception) as e:
+                        # 타임아웃 발생 시 즉시 예외 발생하도록 타임아웃 적용
+                        img_description = analyze_single_image_with_timeout(img_info, timeout)
+                        if img_description:
+                            image_descriptions.append(f"[Image {img_info['index'] + 1}]: {img_description}")
+                            success = True
+                    except (TimeoutError, FutureTimeoutError) as e:
                         retry_count += 1
                         if retry_count > max_retries:
                             error_msg = f"이미지 {img_info['index'] + 1} 분석 실패 (재시도 {max_retries}회 후 포기): {str(e)}"
                             logger.warning(error_msg)
                             image_descriptions.append(f"[Image {img_info['index'] + 1}]: Error analyzing image - {str(e)}")
+                            success = True  # 포기하고 다음 이미지로
+                        else:
+                            logger.warning(f"이미지 {img_info['index'] + 1} 분석 실패 (재시도 {retry_count}/{max_retries}): {str(e)}")
+                            # 재시도 전 짧은 대기 (타임아웃이 발생했으므로 즉시 재시도)
+                            time.sleep(0.5)
+                    except Exception as e:
+                        retry_count += 1
+                        if retry_count > max_retries:
+                            error_msg = f"이미지 {img_info['index'] + 1} 분석 실패 (재시도 {max_retries}회 후 포기): {str(e)}"
+                            logger.warning(error_msg)
+                            image_descriptions.append(f"[Image {img_info['index'] + 1}]: Error analyzing image - {str(e)}")
+                            success = True  # 포기하고 다음 이미지로
                         else:
                             logger.warning(f"이미지 {img_info['index'] + 1} 분석 실패 (재시도 {retry_count}/{max_retries}): {str(e)}")
                             time.sleep(1)  # 재시도 전 잠시 대기
@@ -371,37 +420,84 @@ def process_pdf(_pdf_path, ollama_client=None):
             while batch_retry_count <= batch_max_retries and not batch_success:
                 try:
                     with ThreadPoolExecutor(max_workers=batch_size) as executor:
-                        futures = {
-                            executor.submit(process_single_page_with_ollama, page_num, doc[page_num], doc, ollama_client): page_num
-                            for page_num in batch_pages
-                        }
+                        # 각 future와 시작 시간을 추적
+                        futures_with_time = {}
+                        batch_start_time = time.time()
+                        
+                        for page_num in batch_pages:
+                            future = executor.submit(process_single_page_with_ollama, page_num, doc[page_num], doc, ollama_client, page_timeout)
+                            futures_with_time[future] = {'page_num': page_num, 'start_time': time.time()}
                         
                         # 완료된 작업부터 결과 수집 (타임아웃 적용)
                         completed_pages = set()
                         batch_failed = False
                         
                         try:
-                            for future in as_completed(futures, timeout=batch_timeout):
+                            # 각 future를 개별적으로 체크하여 타임아웃 방지
+                            remaining_futures = dict(futures_with_time)
+                            
+                            while remaining_futures and (time.time() - batch_start_time) < batch_timeout:
+                                # 완료된 future 찾기
+                                done_futures = []
+                                for future, info in list(remaining_futures.items()):
+                                    page_num = info['page_num']
+                                    future_start_time = info['start_time']
+                                    
+                                    try:
+                                        # 완료된 future 체크
+                                        if future.done():
+                                            done_futures.append((future, page_num))
+                                        # 타임아웃 체크: 각 페이지는 page_timeout 내에 완료되어야 함
+                                        elif (time.time() - future_start_time) > page_timeout:
+                                            # 이 페이지가 타임아웃되었지만 아직 완료되지 않음
+                                            logger.warning(f"페이지 {page_num + 1} 처리 타임아웃 ({page_timeout}초 초과). 취소 중...")
+                                            future.cancel()  # future 취소 시도
+                                            batch_results[page_num] = (page_num + 1, "")
+                                            completed_pages.add(page_num)
+                                            batch_failed = True
+                                            del remaining_futures[future]
+                                    except Exception:
+                                        pass
+                                
+                                # 완료된 future 처리
+                                for future, page_num in done_futures:
+                                    try:
+                                        result = future.result(timeout=0.5)  # 짧은 타임아웃
+                                        batch_results[page_num] = result
+                                        completed_pages.add(page_num)
+                                        del remaining_futures[future]
+                                    except (TimeoutError, FutureTimeoutError, Exception) as e:
+                                        error_msg = f"페이지 {page_num + 1} 처리 실패: {str(e)}"
+                                        logger.warning(error_msg)
+                                        batch_results[page_num] = (page_num + 1, "")
+                                        completed_pages.add(page_num)
+                                        batch_failed = True
+                                        del remaining_futures[future]
+                                
+                                # 완료된 future가 없으면 잠시 대기
+                                if not done_futures:
+                                    time.sleep(0.2)  # 더 짧은 대기 시간
+                            
+                            # 타임아웃으로 남은 future들 처리 (즉시 취소)
+                            for future, info in list(remaining_futures.items()):
+                                page_num = info['page_num']
                                 try:
-                                    # 각 future에 타임아웃 적용
-                                    result = future.result(timeout=page_timeout)
-                                    page_num = futures[future]
+                                    # future 취소 시도
+                                    future.cancel()
+                                    logger.warning(f"페이지 {page_num + 1} 처리 타임아웃. future 취소됨")
+                                except Exception:
+                                    pass
+                                
+                                # 취소되지 않은 경우 마지막 시도 (매우 짧은 타임아웃)
+                                try:
+                                    result = future.result(timeout=1)
                                     batch_results[page_num] = result
                                     completed_pages.add(page_num)
-                                except TimeoutError as e:
-                                    page_num = futures.get(future, 'unknown')
-                                    error_msg = f"페이지 {page_num + 1 if isinstance(page_num, int) else page_num} 처리 타임아웃 ({page_timeout}초 초과)"
+                                except (TimeoutError, FutureTimeoutError, Exception) as e:
+                                    error_msg = f"페이지 {page_num + 1} 처리 타임아웃 또는 실패: {str(e)}"
                                     logger.warning(error_msg)
-                                    if isinstance(page_num, int):
-                                        batch_results[page_num] = (page_num + 1, "")
-                                        completed_pages.add(page_num)
-                                    batch_failed = True
-                                except Exception as e:
-                                    page_num = futures.get(future, 'unknown')
-                                    logger.warning(f"페이지 {page_num + 1 if isinstance(page_num, int) else page_num} 처리 실패: {e}")
-                                    if isinstance(page_num, int):
-                                        batch_results[page_num] = (page_num + 1, "")
-                                        completed_pages.add(page_num)
+                                    batch_results[page_num] = (page_num + 1, "")
+                                    completed_pages.add(page_num)
                                     batch_failed = True
                             
                             # 모든 페이지가 완료되었는지 확인
@@ -410,9 +506,9 @@ def process_pdf(_pdf_path, ollama_client=None):
                             else:
                                 batch_failed = True
                                 
-                        except TimeoutError:
-                            # 배치 전체 타임아웃 발생
-                            logger.warning(f"배치 처리 타임아웃 ({batch_timeout}초 초과). 재시도 {batch_retry_count}/{batch_max_retries}")
+                        except Exception as e:
+                            # 예상치 못한 예외 발생
+                            logger.error(f"배치 처리 중 예외 발생: {e}")
                             batch_failed = True
                             
                             # 완료되지 않은 페이지들을 빈 결과로 처리

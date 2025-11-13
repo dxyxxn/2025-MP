@@ -26,7 +26,7 @@ redis>=5.0.0
 mutagen>=1.47.0
 pydub>=0.25.1
 
-# Ollama for local LLM (PDF 이미지 분석, 타임아웃 및 재시도 지원)
+# Ollama for local LLM (PDF 이미지 분석, 강제 타임아웃 및 재시도 지원)
 ollama>=0.1.0
 
 # YouTube video/audio download (YouTube URL을 통한 오디오 다운로드)
