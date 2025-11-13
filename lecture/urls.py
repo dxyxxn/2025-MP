@@ -21,4 +21,10 @@ urlpatterns = [
     
     # 4. (선택사항) 업로드 상태 폴링 API
     path('api/lecture_status/<int:lecture_id>/', views.api_lecture_status_view, name='api_lecture_status'),
+    
+    # 5. 요약 파일 다운로드
+    path('lecture/<int:lecture_id>/download_summary/', views.download_summary_view, name='download_summary'),
+    
+    # 6. 스크립트 파일 다운로드
+    path('lecture/<int:lecture_id>/download_script/', views.download_script_view, name='download_script'),
 ]

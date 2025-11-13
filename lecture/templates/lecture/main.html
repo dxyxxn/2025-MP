@@ -493,10 +493,18 @@
                     <!-- 요약본 컬럼 -->
                     <div class="col-lg-4 h-100">
                         <div class="card h-100">
-                            <div class="card-header bg-secondary text-white">
+                            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
                                 <h6 class="card-title mb-0">
                                     <i class="bi bi-list-check"></i> 소주제별 요약본
                                 </h6>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{% url 'download_summary' lecture.id %}" class="btn btn-light btn-sm download-link" data-download-type="summary" title="요약 파일 다운로드">
+                                        <i class="bi bi-download"></i> 요약 다운로드
+                                    </a>
+                                    <a href="{% url 'download_script' lecture.id %}" class="btn btn-light btn-sm download-link" data-download-type="script" title="스크립트 파일 다운로드">
+                                        <i class="bi bi-file-text"></i> 스크립트 다운로드
+                                    </a>
+                                </div>
                             </div>
                             <div class="card-body summary-container">
                                 {% if summary_list %}
@@ -703,6 +711,74 @@
             console.error('PDF 로드 오류:', error);
             pdfContainer.innerHTML = 
                 '<div class="alert alert-danger m-3" role="alert">PDF를 로드할 수 없습니다. <a href="' + pdfUrl + '" target="_blank" class="alert-link">여기를 클릭하여 새 창에서 열기</a></div>';
+        });
+    </script>
+
+    <script>
+        // 다운로드 링크 클릭 시 파일 다운로드 처리
+        document.addEventListener('DOMContentLoaded', function() {
+            const downloadLinks = document.querySelectorAll('.download-link');
+            
+            downloadLinks.forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault(); // 기본 링크 동작(페이지 이동) 방지
+                    
+                    const downloadUrl = this.href;
+                    const downloadType = this.dataset.downloadType;
+                    
+                    // fetch로 파일 다운로드
+                    fetch(downloadUrl)
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error('다운로드 실패');
+                            }
+                            
+                            // Content-Disposition 헤더에서 파일명 추출 시도
+                            const contentDisposition = response.headers.get('Content-Disposition');
+                            let filename = null;
+                            
+                            if (contentDisposition) {
+                                // filename*=UTF-8'' 형식 처리
+                                const utf8Match = contentDisposition.match(/filename\*=UTF-8''(.+)/i);
+                                if (utf8Match) {
+                                    filename = decodeURIComponent(utf8Match[1]);
+                                } else {
+                                    // 일반 filename= 형식 처리
+                                    const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                                    if (filenameMatch && filenameMatch[1]) {
+                                        filename = filenameMatch[1].replace(/['"]/g, '');
+                                    }
+                                }
+                            }
+                            
+                            // 파일명이 없으면 기본값 사용
+                            if (!filename) {
+                                filename = downloadType === 'summary' ? 'summary.txt' : 'script.txt';
+                            }
+                            
+                            return response.blob().then(blob => ({ blob, filename }));
+                        })
+                        .then(({ blob, filename }) => {
+                            // Blob URL 생성
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            
+                            // 다운로드 트리거
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            
+                            // Blob URL 해제
+                            window.URL.revokeObjectURL(url);
+                        })
+                        .catch(error => {
+                            console.error('다운로드 오류:', error);
+                            alert('파일 다운로드 중 오류가 발생했습니다.');
+                        });
+                });
+            });
         });
     </script>
 

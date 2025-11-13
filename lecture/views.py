@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.contrib.auth import login, authenticate, logout, get_user_model
 from django.contrib.auth.decorators import login_required
@@ -8,6 +8,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.apps import apps
 import os
+from urllib.parse import quote
 from .models import Lecture, ProcessingStats, CustomUser, PdfChunk, Mapping
 from .tasks import process_lecture_task, calculate_etr_task, start_process_from_url_task # Celery 태스크 임포트
 from .services import init_gemini_models, init_chromadb_client, get_rag_response
@@ -295,6 +296,105 @@ def api_lecture_status_view(request, lecture_id):
         'step_time': step_time,  # 현재 단계의 소요 시간
         'youtube_url': lecture.youtube_url if lecture.youtube_url else None  # YouTube URL 여부 확인용
     })
+
+# 5. 요약 파일 다운로드
+@login_required
+def download_summary_view(request, lecture_id):
+    """
+    강의의 소주제별 요약본을 TXT 파일로 다운로드합니다.
+    """
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    
+    # 요약 데이터가 없으면 에러 반환
+    if not lecture.summary_json:
+        messages.error(request, '요약 데이터가 없습니다.')
+        return redirect('lecture_detail', lecture_id=lecture_id)
+    
+    try:
+        # JSON 데이터 파싱
+        summary_data = json.loads(lecture.summary_json) if isinstance(lecture.summary_json, str) else lecture.summary_json
+        summary_list = summary_data.get('summary_list', [])
+        
+        # 매핑 정보 가져오기
+        mappings_dict = {mapping.summary_topic: mapping.mapped_pdf_page for mapping in lecture.mappings.all()}
+        
+        # TXT 파일 내용 생성
+        txt_content = []
+        txt_content.append(f"강의명: {lecture.lecture_name}\n")
+        txt_content.append(f"생성일: {lecture.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        txt_content.append("=" * 80 + "\n\n")
+        
+        for idx, item in enumerate(summary_list, 1):
+            txt_content.append(f"[소주제 {idx}] {item.get('topic', '제목 없음')}\n")
+            txt_content.append("-" * 80 + "\n")
+            
+            if item.get('timestamp'):
+                txt_content.append(f"타임스탬프: {item.get('timestamp')}\n")
+            
+            if item.get('topic') in mappings_dict:
+                txt_content.append(f"PDF 페이지: {mappings_dict[item.get('topic')]}p\n")
+            
+            txt_content.append(f"\n요약:\n{item.get('summary', '요약 내용 없음')}\n\n")
+            
+            if item.get('original_segment'):
+                txt_content.append(f"원본 구간:\n{item.get('original_segment')}\n")
+            
+            txt_content.append("\n" + "=" * 80 + "\n\n")
+        
+        # 파일명 생성 (한글 파일명 지원)
+        filename = f"{lecture.lecture_name}_요약.txt"
+        # 파일명을 UTF-8로 인코딩하여 브라우저 호환성 확보
+        encoded_filename = quote(filename.encode('utf-8'))
+        
+        # HttpResponse로 파일 다운로드
+        response = HttpResponse(''.join(txt_content), content_type='text/plain; charset=utf-8')
+        # RFC 5987 형식으로 파일명 설정 (한글 파일명 지원)
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'요약 파일 다운로드 중 오류가 발생했습니다: {str(e)}')
+        return redirect('lecture_detail', lecture_id=lecture_id)
+
+# 6. 스크립트 파일 다운로드
+@login_required
+def download_script_view(request, lecture_id):
+    """
+    강의의 타임스탬프가 포함된 전체 스크립트를 TXT 파일로 다운로드합니다.
+    """
+    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    
+    # 스크립트 데이터가 없으면 에러 반환
+    if not lecture.full_script:
+        messages.error(request, '스크립트 데이터가 없습니다.')
+        return redirect('lecture_detail', lecture_id=lecture_id)
+    
+    try:
+        # TXT 파일 내용 생성
+        txt_content = []
+        txt_content.append(f"강의명: {lecture.lecture_name}\n")
+        txt_content.append(f"생성일: {lecture.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
+        txt_content.append("=" * 80 + "\n\n")
+        txt_content.append("전체 스크립트 (타임스탬프 포함)\n")
+        txt_content.append("-" * 80 + "\n\n")
+        txt_content.append(lecture.full_script)
+        
+        # 파일명 생성 (한글 파일명 지원)
+        filename = f"{lecture.lecture_name}_스크립트.txt"
+        # 파일명을 UTF-8로 인코딩하여 브라우저 호환성 확보
+        encoded_filename = quote(filename.encode('utf-8'))
+        
+        # HttpResponse로 파일 다운로드
+        response = HttpResponse(''.join(txt_content), content_type='text/plain; charset=utf-8')
+        # RFC 5987 형식으로 파일명 설정 (한글 파일명 지원)
+        response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        
+        return response
+        
+    except Exception as e:
+        messages.error(request, f'스크립트 파일 다운로드 중 오류가 발생했습니다: {str(e)}')
+        return redirect('lecture_detail', lecture_id=lecture_id)
 
 # 관리자 페이지
 @login_required
