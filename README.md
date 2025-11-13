@@ -13,7 +13,7 @@
 ### AI/ML 서비스
 - **Google Gemini API**: 
   - STT (Speech-to-Text): 오디오를 텍스트로 변환
-  - 텍스트 요약: 강의 스크립트를 소주제별로 요약 (JSON 오류 처리 및 재시도 로직 포함)
+  - 텍스트 요약: 강의 스크립트를 소주제별로 요약
   - 텍스트 임베딩: 의미 기반 검색을 위한 벡터 생성
 - **Ollama (로컬 LLM)**:
   - PDF 이미지 분석: bakllava 멀티모달 모델을 사용하여 PDF 내 이미지, 다이어그램, 차트 분석
@@ -97,21 +97,16 @@
 
 ### 4. 학습 페이지
 - **접근 제어**: 로그인한 모든 사용자가 강의를 볼 수 있도록 공유 기능 지원
-  - 강의 소유자뿐만 아니라 다른 사용자도 URL을 통해 강의 페이지에 접근 가능
   - 로그인하지 않은 사용자는 로그인 페이지로 리다이렉트되며, 로그인 후 원래 접속하려던 페이지로 자동 이동
 - **공유 기능**: 공유하기 버튼을 통해 현재 페이지 URL을 클립보드에 복사
-  - 클릭 시 현재 페이지의 전체 URL이 클립보드에 복사됨
-  - 복사 성공 시 시각적 피드백 제공
 - **PDF 뷰어**: 강의 자료를 페이지별로 표시
 - **음성 스크립트**: 타임스탬프가 포함된 전체 스크립트 표시
 - **소주제별 요약**: 아코디언 형태로 요약 내용 표시 (PDF 페이지 번호 포함)
 - **RAG 챗봇**: 강의 내용에 대한 질문에 AI가 답변 (벡터 검색 기반)
-  - **권한 제어**: 강의 소유자만 RAG 질의응답 기능 사용 가능
   - 소유자가 아닌 사용자의 경우 입력 필드와 전송 버튼이 비활성화되며 안내 메시지 표시
 - **요약 파일 다운로드**: 소주제별 요약본을 TXT 파일로 다운로드 (한글 파일명 지원)
   - 요약 다운로드: 소주제별 요약, 타임스탬프, PDF 페이지 매핑 정보 포함
   - 스크립트 다운로드: 타임스탬프가 포함된 전체 스크립트를 TXT 파일로 다운로드
-  - JavaScript 기반 자동 다운로드: 클릭 시 페이지 이동 없이 바로 파일 다운로드
 
 ### 5. 관리자 대시보드
 - **접근 권한**: `is_staff` 플래그가 있는 사용자만 접근 가능
@@ -122,7 +117,6 @@
   - 요약 평균 (초/분)
   - 마지막 업데이트 시간
 - **데이터베이스 정보**: 각 모델의 테이블 정보 표시
-  - 모델 이름 우선 표시 (예: CustomUser (auth_user))
   - 실제 사용 중인 컬럼만 필터링하여 표시
   - 각 테이블의 튜플 수 표시
 
@@ -150,9 +144,9 @@
 파일 업로드 또는 YouTube URL 입력 (오디오 + PDF)
     ↓
 데이터베이스에 강의 정보 저장
-    ↓
-[YouTube URL인 경우] yt-dlp로 오디오 다운로드 (10분 타임아웃)
-    ↓
+    │                ↓
+    │       [YouTube URL인 경우] yt-dlp로 오디오 다운로드 (10분 타임아웃)
+    ↓                ↓
 ETR 계산 태스크 시작 (비동기, 빠른 계산)
     ↓
 처리 중 페이지로 즉시 리다이렉트
@@ -169,7 +163,9 @@ Celery 백그라운드 작업 시작
     │   └─ 데이터 저장
     └─ 처리 통계 업데이트 (ETR 예측 정확도 향상)
     ↓
-처리 완료 → 학습 페이지로 자동 이동
+처리 완료 
+    ↓
+학습 페이지로 자동 이동
 ```
 
 ### 3. 학습 페이지 사용 흐름
@@ -284,13 +280,73 @@ AI가 컨텍스트 기반 답변 생성
 ## 설치 및 실행
 
 ### 필수 요구사항
-- Python 3.12+
-- Redis 서버
-- Ollama (로컬 LLM 서버)
-- FFmpeg (오디오 처리용, 선택사항)
-- yt-dlp (YouTube URL을 통한 오디오 다운로드용)
 
-### Ollama 설치 및 설정
+#### 시스템 요구사항
+- **Python 3.12+**: Django 5.2.7 및 모든 Python 패키지 실행을 위해 필요
+- **Redis 서버**: Celery 브로커 및 결과 백엔드로 사용
+- **Ollama**: 로컬 LLM 서버 (PDF 이미지 분석용)
+- **FFmpeg**: 오디오 파일 처리용 (pydub가 필요로 함)
+
+#### Python 패키지
+다음 패키지들이 `requirements.txt`에 포함되어 있으며, `pip install -r requirements.txt`로 자동 설치됩니다:
+- Django 5.2.7
+- django-environ 0.11.2
+- google-generativeai (Gemini API)
+- PyMuPDF (PDF 텍스트 추출)
+- chromadb (벡터 데이터베이스)
+- celery (비동기 작업 처리)
+- redis (Celery 브로커)
+- mutagen, pydub (오디오 처리)
+- ollama (로컬 LLM 클라이언트)
+- yt-dlp (YouTube 오디오 다운로드)
+- tqdm (진행률 표시)
+
+### 요구사항 설치 방법
+
+#### 1. Python 설치
+```bash
+# Python 3.12 이상이 설치되어 있는지 확인
+python3 --version
+
+# 설치되어 있지 않은 경우
+# Ubuntu/Debian
+sudo apt update
+sudo apt install python3.12 python3.12-venv python3-pip
+
+# macOS (Homebrew 사용)
+brew install python@3.12
+```
+
+#### 2. Redis 서버 설치 및 실행
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install redis-server
+sudo systemctl start redis-server
+sudo systemctl enable redis-server  # 부팅 시 자동 시작
+
+# macOS (Homebrew 사용)
+brew install redis
+brew services start redis
+
+# 설치 확인
+redis-cli ping  # PONG 응답이 나오면 정상
+```
+
+#### 3. FFmpeg 설치
+```bash
+# Ubuntu/Debian
+sudo apt update
+sudo apt install ffmpeg
+
+# macOS (Homebrew 사용)
+brew install ffmpeg
+
+# 설치 확인
+ffmpeg -version
+```
+
+#### 4. Ollama 설치 및 설정
 
 1. **Ollama 설치**
    ```bash
@@ -312,15 +368,42 @@ AI가 컨텍스트 기반 답변 생성
    - 기본적으로 `http://localhost:11434`에서 실행됩니다
    - GPU가 있으면 자동으로 사용합니다
 
+#### 5. Python 패키지 설치
+```bash
+# 가상 환경 생성 (권장)
+python3 -m venv venv
+source venv/bin/activate  # Linux/Mac
+# 또는
+# venv\Scripts\activate  # Windows
+
+# 프로젝트 의존성 설치
+pip install -r requirements.txt
+```
+
 ### 환경 변수 설정
-`.env` 파일에 다음 변수를 설정해야 합니다:
+프로젝트 루트 디렉토리에 `.env` 파일을 생성하고 다음 변수를 설정해야 합니다:
+
+#### 필수 환경 변수
 - `SECRET_KEY`: Django 시크릿 키
 - `GEMINI_API_KEY`: Google Gemini API 키
-- `OLLAMA_BASE_URL`: Ollama 서버 URL (기본값: `http://localhost:11434`)
-- `OLLAMA_MODEL`: 사용할 모델명 (기본값: `bakllava`)
-- `OLLAMA_BATCH_SIZE`: PDF 처리 배치 크기 (기본값: `4`)
-- `OLLAMA_TIMEOUT`: Ollama 요청 타임아웃(초) (기본값: `30`)
-- `OLLAMA_MAX_RETRIES`: Ollama 요청 최대 재시도 횟수 (기본값: `2`)
+
+#### 선택적 환경 변수
+- `OLLAMA_BASE_URL`: Ollama 서버 URL
+- `OLLAMA_MODEL`: 사용할 모델명
+- `OLLAMA_BATCH_SIZE`: PDF 처리 배치 크기
+- `OLLAMA_TIMEOUT`: Ollama 요청 타임아웃(초)
+- `OLLAMA_MAX_RETRIES`: Ollama 요청 최대 재시도 횟수
+
+#### .env 파일 예시
+```env
+SECRET_KEY=your-django-secret-key-here
+GEMINI_API_KEY=your-gemini-api-key-here
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_MODEL=bakllava
+OLLAMA_BATCH_SIZE=4
+OLLAMA_TIMEOUT=30
+OLLAMA_MAX_RETRIES=2
+```
 
 ### 관리자 계정 생성
 관리자 대시보드에 접근하려면 `is_staff` 플래그가 있는 계정이 필요합니다:
@@ -328,6 +411,7 @@ AI가 컨텍스트 기반 답변 생성
 python manage.py create_admin
 ```
 기본 관리자 계정 (ID: `admin`, 비밀번호: `000000`)이 생성되거나 업데이트됩니다.
+기본 ID/PW 수정은 lecture/management/commands/create_admin.py에서 가능합니다.
 
 ### 실행 방법
 1. 의존성 설치: `pip install -r requirements.txt`
@@ -400,19 +484,13 @@ python manage.py check_stuck_tasks --dry-run
 - **의미 기반 검색**: 벡터 유사도를 활용한 정확한 문서 검색
 - **자동 매핑**: AI가 요약 내용과 PDF 페이지를 자동으로 연결
 - **강의 공유 기능**: 
-  - 로그인한 모든 사용자가 강의 페이지에 접근 가능
   - 공유하기 버튼을 통해 URL 복사 및 공유
   - 로그인하지 않은 사용자는 로그인 후 원래 페이지로 자동 리다이렉트
   - RAG 기능은 강의 소유자만 사용 가능 (권한 제어)
 - **관리자 대시보드**: 
-  - `is_staff` 권한 기반 접근 제어
+  - 권한 기반 접근 제어
   - ProcessingStats 실시간 통계 모니터링
-  - 데이터베이스 테이블 정보 조회 (모델 이름 우선 표시, 사용 중인 컬럼만 필터링)
-- **요약 파일 다운로드 기능**: 
-  - 소주제별 요약본과 스크립트를 TXT 파일로 다운로드
-  - 한글 파일명 지원 (RFC 5987 형식)
-  - JavaScript 기반 자동 다운로드로 페이지 이동 없이 바로 다운로드
-  - 요약 파일: 소주제별 요약, 타임스탬프, PDF 페이지 매핑 정보 포함
-  - 스크립트 파일: 타임스탬프가 포함된 전체 스크립트
+  - 데이터베이스 테이블 정보 조회
+- **요약 파일 다운로드 기능**: 소주제별 요약본과 스크립트를 TXT 파일로 다운로드
 - **타임존 설정**: 한국 표준시(KST, Asia/Seoul) 사용
 - **반응형 UI**: 모바일과 데스크톱 모두에서 최적화된 사용자 경험
