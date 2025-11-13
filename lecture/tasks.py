@@ -747,73 +747,16 @@ def task_failure_handler(sender=None, task_id=None, exception=None, traceback=No
         # 시그널 핸들러 오류는 무시 (작업 내부에서 이미 처리됨)
         pass
 
-# Celery 워커 시작 시 자동으로 오래된 작업 체크 및 재시작
+# Celery 워커 시작 시 자동으로 오래된 작업 체크
 @worker_ready.connect
 def worker_ready_handler(sender=None, **kwargs):
     """
     Celery 워커가 준비되었을 때 호출되는 시그널 핸들러
     워커 시작 시 오래된 '처리 중' 작업을 자동으로 감지하고 실패로 표시합니다.
-    그 후 멈춘 작업을 재시작하되, 실패 상태인 작업은 재시작하지 않습니다.
     """
     try:
         print("[Celery 워커 시작] 오래된 작업을 자동으로 체크합니다...")
-        # 1. 먼저 오래된 작업을 실패로 변경
         check_and_mark_stuck_tasks(minutes=18, dry_run=False)
-        
-        # 2. 멈춘 작업 재시작 (실패 상태 제외)
-        print("[Celery 워커 시작] 멈춘 작업을 재시작합니다...")
-        restart_stuck_tasks()
     except Exception as e:
         # 워커 시작 시 체크 실패는 무시 (워커는 계속 실행되어야 함)
         print(f"[Celery 워커 시작] 오래된 작업 체크 중 오류 발생 (무시됨): {e}")
-
-def restart_stuck_tasks(minutes=5):
-    """
-    멈춘 '처리 중' 상태의 강의를 재시작하는 함수
-    실패 상태인 작업은 재시작하지 않습니다.
-    
-    Args:
-        minutes: 몇 분 이상 지난 작업을 재시작할지 지정 (기본값: 5)
-    
-    Returns:
-        tuple: (발견된 작업 수, 재시작된 작업 수)
-    """
-    cutoff_time = timezone.now() - timedelta(minutes=minutes)
-    
-    # '처리 중' 상태이고 지정된 시간 이상 지난 강의 찾기 (실패 상태 제외)
-    stuck_lectures = Lecture.objects.filter(
-        status='processing',  # 실패 상태는 제외
-        created_at__lt=cutoff_time
-    ).order_by('created_at')
-    
-    count = stuck_lectures.count()
-    restarted_count = 0
-    
-    if count > 0:
-        print(f"[재시작 로직] {count}개의 멈춘 '처리 중' 상태 강의를 발견했습니다. (기준: {minutes}분 이상)")
-        
-        for lecture in stuck_lectures:
-            age_minutes = (timezone.now() - lecture.created_at).total_seconds() / 60
-            print(f"  - 강의 ID {lecture.id}: '{lecture.lecture_name}' (경과: {age_minutes:.1f}분) 재시작 중...")
-            
-            try:
-                # 상태가 여전히 'processing'인지 확인 (다른 프로세스가 실패로 변경했을 수 있음)
-                lecture.refresh_from_db()
-                if lecture.status == 'processing':
-                    # 재시작
-                    if lecture.youtube_url:
-                        start_process_from_url_task.delay(lecture.id)
-                    else:
-                        process_lecture_task.delay(lecture.id)
-                    restarted_count += 1
-                    print(f"    ✓ 강의 ID {lecture.id} 재시작 완료")
-                else:
-                    print(f"    ✗ 강의 ID {lecture.id}는 이미 '{lecture.status}' 상태입니다. 재시작하지 않습니다.")
-            except Exception as e:
-                print(f"    ✗ 강의 ID {lecture.id} 재시작 실패: {e}")
-        
-        print(f"[재시작 로직] {restarted_count}개의 강의를 재시작했습니다.")
-    else:
-        print(f"[재시작 로직] 재시작할 멈춘 '처리 중' 상태의 강의가 없습니다. (기준: {minutes}분 이상)")
-    
-    return count, restarted_count
