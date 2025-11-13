@@ -7,6 +7,7 @@ from django.db import IntegrityError, connection, models
 from django.conf import settings
 from django.contrib import messages
 from django.apps import apps
+from django.utils.http import url_has_allowed_host_and_scheme
 import os
 from urllib.parse import quote
 from .models import Lecture, ProcessingStats, CustomUser, PdfChunk, Mapping
@@ -17,6 +18,10 @@ import json
 # 로그인 페이지
 def login_view(request):
     if request.user.is_authenticated:
+        # next 파라미터 확인
+        next_url = request.GET.get('next') or request.POST.get('next')
+        if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts=None):
+            return redirect(next_url)
         # is_staff이면 관리자 페이지로, 아니면 upload 페이지로
         if request.user.is_staff:
             return redirect('admin_dashboard')
@@ -25,11 +30,15 @@ def login_view(request):
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
+        next_url = request.POST.get('next') or request.GET.get('next')
         
         if username and password:
             user = authenticate(request, username=username, password=password)
             if user is not None:
                 login(request, user)
+                # next 파라미터가 있고 안전한 URL이면 해당 페이지로 리다이렉트
+                if next_url and url_has_allowed_host_and_scheme(next_url, allowed_hosts=None):
+                    return redirect(next_url)
                 # is_staff이면 관리자 페이지로, 아니면 upload 페이지로
                 if user.is_staff:
                     return redirect('admin_dashboard')
@@ -39,7 +48,9 @@ def login_view(request):
         else:
             messages.error(request, '아이디와 비밀번호를 모두 입력해주세요.')
     
-    return render(request, 'lecture/login.html')
+    # GET 요청 시 next 파라미터를 템플릿에 전달
+    context = {'next': request.GET.get('next', '')}
+    return render(request, 'lecture/login.html', context)
 
 # 회원가입 페이지
 def signup_view(request):
@@ -225,7 +236,8 @@ def upload_view(request):
 # 2. 메인 학습 페이지
 @login_required
 def lecture_detail_view(request, lecture_id):
-    lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+    # 소유자 확인 제거: 로그인한 모든 사용자가 접근 가능
+    lecture = get_object_or_404(Lecture, id=lecture_id)
     
     # 처리 중이면 다른 페이지 표시 (간소화)
     if lecture.status != 'completed':
@@ -248,10 +260,14 @@ def lecture_detail_view(request, lecture_id):
         final_summary_list.append(item)
     # ----------------------------------------
 
+    # 소유자 여부 확인
+    is_owner = (lecture.user == request.user)
+
     context = {
         'lecture': lecture,
         'summary_list': summary_data.get('summary_list') if summary_data else [],
-        'mappings': lecture.mappings.all() # (이건 로직 수정 필요)
+        'mappings': lecture.mappings.all(), # (이건 로직 수정 필요)
+        'is_owner': is_owner  # 소유자 여부를 템플릿에 전달
     }
     return render(request, 'lecture/main.html', context)
 
@@ -265,8 +281,15 @@ def api_chat_view(request):
         query_text = data.get('query_text')
         
         try:
-            # 사용자의 강의인지 확인
-            lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
+            # 강의 존재 확인
+            lecture = get_object_or_404(Lecture, id=lecture_id)
+            
+            # 소유자 확인: 소유자가 아닌 경우 에러 반환
+            if lecture.user != request.user:
+                return JsonResponse({
+                    'role': 'assistant', 
+                    'content': '강의 소유자만 RAG 질의응답을 사용할 수 있습니다.'
+                }, status=403)
             
             # 서비스 로직 호출
             models = init_gemini_models()

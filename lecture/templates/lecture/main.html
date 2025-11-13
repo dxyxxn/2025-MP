@@ -410,9 +410,14 @@
                 <a class="navbar-brand" href="{% url 'upload' %}">
                     <i class="bi bi-mortarboard-fill"></i> LectureAI
                 </a>
-                <a href="{% url 'upload' %}" class="btn btn-light">
-                    <i class="bi bi-arrow-left"></i> 업로드 페이지로 돌아가기
-                </a>
+                <div class="d-flex gap-2">
+                    <button id="share-link-btn" class="btn btn-light" title="공유하기">
+                        <i class="bi bi-link-45deg"></i> 공유하기
+                    </button>
+                    <a href="{% url 'upload' %}" class="btn btn-light">
+                        <i class="bi bi-arrow-left"></i> 업로드 페이지로 돌아가기
+                    </a>
+                </div>
             </div>
         </nav>
 
@@ -474,12 +479,18 @@
                                     </h6>
                                 </div>
                                 <div class="card-body rag-container">
-                                    <div id="chat-container"></div>
+                                    <div id="chat-container">
+                                        {% if not is_owner %}
+                                        <div class="alert alert-info mb-0" role="alert">
+                                            <i class="bi bi-info-circle"></i> 강의 소유자만 RAG 질의응답을 사용할 수 있습니다.
+                                        </div>
+                                        {% endif %}
+                                    </div>
                                     <div class="chat-form-wrapper">
                                         <form id="chat-form" data-lecture-id="{{ lecture.id }}">
                                             <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control" id="chat-input" placeholder="강의 내용에 대해 질문해 주세요...">
-                                                <button type="submit" class="btn btn-primary">
+                                                <input type="text" class="form-control" id="chat-input" placeholder="강의 내용에 대해 질문해 주세요..." {% if not is_owner %}disabled{% endif %}>
+                                                <button type="submit" class="btn btn-primary" {% if not is_owner %}disabled{% endif %}>
                                                     <i class="bi bi-send"></i> 전송
                                                 </button>
                                             </div>
@@ -783,6 +794,65 @@
     </script>
 
     <script>
+        // 공유 링크 복사 기능
+        document.addEventListener('DOMContentLoaded', function() {
+            const shareLinkBtn = document.getElementById('share-link-btn');
+            
+            if (shareLinkBtn) {
+                shareLinkBtn.addEventListener('click', function() {
+                    // 현재 페이지의 전체 URL 가져오기
+                    const currentUrl = window.location.href;
+                    
+                    // 클립보드에 복사
+                    navigator.clipboard.writeText(currentUrl).then(function() {
+                        // 복사 성공 시 피드백
+                        const originalText = shareLinkBtn.innerHTML;
+                        shareLinkBtn.innerHTML = '<i class="bi bi-check-circle"></i> 링크가 복사되었습니다!';
+                        shareLinkBtn.classList.remove('btn-light');
+                        shareLinkBtn.classList.add('btn-success');
+                        
+                        // 2초 후 원래 상태로 복원
+                        setTimeout(function() {
+                            shareLinkBtn.innerHTML = originalText;
+                            shareLinkBtn.classList.remove('btn-success');
+                            shareLinkBtn.classList.add('btn-light');
+                        }, 2000);
+                    }).catch(function(err) {
+                        // 복사 실패 시 (구형 브라우저 대응)
+                        console.error('클립보드 복사 실패:', err);
+                        
+                        // 대체 방법: 텍스트 영역을 사용한 복사
+                        const textArea = document.createElement('textarea');
+                        textArea.value = currentUrl;
+                        textArea.style.position = 'fixed';
+                        textArea.style.opacity = '0';
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        
+                        try {
+                            document.execCommand('copy');
+                            const originalText = shareLinkBtn.innerHTML;
+                            shareLinkBtn.innerHTML = '<i class="bi bi-check-circle"></i> 링크가 복사되었습니다!';
+                            shareLinkBtn.classList.remove('btn-light');
+                            shareLinkBtn.classList.add('btn-success');
+                            
+                            setTimeout(function() {
+                                shareLinkBtn.innerHTML = originalText;
+                                shareLinkBtn.classList.remove('btn-success');
+                                shareLinkBtn.classList.add('btn-light');
+                            }, 2000);
+                        } catch (err) {
+                            alert('링크 복사에 실패했습니다. 수동으로 복사해주세요: ' + currentUrl);
+                        }
+                        
+                        document.body.removeChild(textArea);
+                    });
+                });
+            }
+        });
+    </script>
+
+    <script>
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-input');
         const chatContainer = document.getElementById('chat-container');
@@ -829,6 +899,12 @@
 
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
+            
+            // RAG 입력이 비활성화된 경우 (소유자가 아닌 경우) 제출 방지
+            if (chatInput.disabled) {
+                return;
+            }
+            
             const userMessage = chatInput.value;
             if (!userMessage) return;
 

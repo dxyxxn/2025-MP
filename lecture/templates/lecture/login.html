@@ -43,6 +43,9 @@
 
                 <form method="post" action="{% url 'login' %}">
                     {% csrf_token %}
+                    {% if next %}
+                    <input type="hidden" name="next" value="{{ next }}">
+                    {% endif %}
                     <div class="mb-3">
                         <label for="username" class="form-label">
                             <i class="bi bi-person-fill"></i> 아이디
