@@ -30,8 +30,57 @@
         .card-header {
             background-color: #22262B;
         }
+        .card-header.bg-primary {
+            background-color: #22262B !important;
+            border-bottom: 1px solid #37383B !important;
+        }
+        .card-header.bg-primary.text-white {
+            color: #FFFFFF !important;
+        }
+        .card-header.bg-primary.text-white h2,
+        .card-header.bg-primary.text-white p {
+            color: #FFFFFF !important;
+        }
+        .card-header.bg-primary.text-white i {
+            color: #FFFFFF !important;
+        }
         .card-body {
             background-color: #22262B;
+        }
+        .btn-primary {
+            background-color: #FFFFFF !important;
+            border-color: #FFFFFF !important;
+            color: #1F2326 !important;
+        }
+        .btn-primary.btn-lg {
+            width: auto;
+            display: inline-block;
+            padding-left: 1.5rem;
+            padding-right: 1.5rem;
+        }
+        .btn-primary:hover {
+            background-color: #F0F0F0 !important;
+            border-color: #F0F0F0 !important;
+            color: #1F2326 !important;
+        }
+        .btn-primary i {
+            color: #1F2326 !important;
+        }
+        .btn-outline-primary {
+            background-color: #FFFFFF !important;
+            border-color: #FFFFFF !important;
+            color: #1F2326 !important;
+        }
+        .btn-outline-primary:hover {
+            background-color: #F0F0F0 !important;
+            border-color: #F0F0F0 !important;
+            color: #1F2326 !important;
+        }
+        .btn-outline-primary i {
+            color: #1F2326 !important;
+        }
+        .btn-outline-primary:hover i {
+            color: #1F2326 !important;
         }
         hr {
             border-color: var(--border-color);
@@ -45,7 +94,6 @@
                 <h2 class="card-title mb-0">
                     <i class="bi bi-mortarboard-fill"></i> LectureAI
                 </h2>
-                <p class="mb-0 mt-2">회원가입</p>
             </div>
             <div class="card-body p-4">
                 {% if messages %}
@@ -78,20 +126,20 @@
                         </label>
                         <input type="password" class="form-control" id="password" name="password" required>
                     </div>
-                    <div class="mb-3">
+                    <div class="mb-3" style="margin-bottom: 1.5rem !important;">
                         <label for="password_confirm" class="form-label">
                             <i class="bi bi-lock-fill"></i> 비밀번호 확인
                         </label>
                         <input type="password" class="form-control" id="password_confirm" name="password_confirm" required>
                     </div>
-                    <div class="d-grid">
+                    <div class="text-center" style="margin-top: 0; margin-bottom: 1.5rem;">
                         <button type="submit" class="btn btn-primary btn-lg">
                             <i class="bi bi-person-plus-fill"></i> 회원가입
                         </button>
                     </div>
                 </form>
                 
-                <hr class="my-4">
+                <hr style="margin-top: 0; margin-bottom: 0;">
                 
                 <div class="text-center">
                     <p class="mb-0">이미 계정이 있으신가요?</p>
