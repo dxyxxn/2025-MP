@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -7,239 +8,328 @@
     <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <!-- 전역 다크 모드 CSS -->
+    <link href="{% static 'lecture/css/dark-theme.css' %}" rel="stylesheet">
     <style>
+        /* 이미지 기반 색상 팔레트 */
+        :root {
+            --bg-primary: #37383B;
+            --bg-secondary: #1A1A1A;
+            --bg-card: #22262B;
+            --bg-header: #252525;
+            --text-primary: #E0E0E0;
+            --text-secondary: #B0B0B0;
+            --border-color: #2A2A2A;
+            --border-radius: 16px;
+        }
+        
+        /* 레이아웃 구조 */
         html, body {
             height: 100%;
             overflow: hidden;
             margin: 0;
             padding: 0;
+            background-color: var(--bg-primary);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
         }
+        
         .main-wrapper {
             height: 100vh;
             display: flex;
             flex-direction: column;
+            background-color: var(--bg-primary);
         }
-        .navbar {
+        
+        /* 상단 헤더 */
+        .top-header {
+            flex-shrink: 0;
+            background-color: #37383B;
+            border-bottom: none;
+            padding: 14px 20px 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .top-header h4 {
+            margin: 0;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 1.5rem;
+        }
+        
+        .top-header h4 i {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+        
+        .top-header-actions {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .download-section {
+            display: inline-flex;
+            align-items: center;
+            gap: 0;
+            cursor: default;
+        }
+        
+        .download-section.btn-sm {
+            padding: 0.25rem 0.5rem;
+        }
+        
+        .download-section:hover {
+            background-color: #F0F0F0;
+            border-color: #F0F0F0;
+        }
+        
+        .download-icon {
+            color: #000000;
+            font-size: 1rem;
+            margin-right: 0px;
+            pointer-events: none;
+        }
+        
+        .download-label {
+            color: #22262B;
+            font-size: 0.875rem;
+            padding: 0 8px;
+            user-select: none;
+            pointer-events: none;
+        }
+        
+        .download-divider {
+            width: 1px;
+            height: 20px;
+            background-color: #CCCCCC;
+            margin: 0 4px;
             flex-shrink: 0;
         }
-        .content-wrapper {
+        
+        .download-link-inner {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0 8px;
+            color: #22262B;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+        
+        .download-link-inner:hover {
+            opacity: 0.7;
+            color: #22262B;
+        }
+        
+        .download-link-inner i {
+            color: #000000;
+            font-size: 1rem;
+        }
+        
+        .top-header-actions .btn {
+            background-color: #FFFFFF;
+            border-color: #FFFFFF;
+            color: #22262B;
+        }
+        
+        .top-header-actions .btn:hover {
+            background-color: #F0F0F0;
+            border-color: #F0F0F0;
+            color: #22262B;
+        }
+        
+        /* 메인 콘텐츠 영역 (3분할 레이아웃) */
+        .main-content-area {
             flex: 1;
+            display: flex;
             overflow: hidden;
+            gap: 17px;
+            padding: 5px 17px 18px 17px;
+            min-height: 0;
+        }
+        
+        /* 각 컬럼 공통 스타일 */
+        .content-column {
             display: flex;
             flex-direction: column;
+            min-width: 0;
+            transition: all 0.3s ease;
         }
-        .page-title {
-            flex-shrink: 0;
-            padding: 10px 15px;
+        
+        .content-column.collapsed {
+            flex: 0 0 50px;
+            min-width: 50px;
+            overflow: visible;
         }
-        .main-content {
+        
+        .content-column.collapsed .content-card-body {
+            display: none;
+        }
+        
+        .content-column.collapsed .content-card-header {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            padding: 8px 8px 16px 8px;
+            height: 100%;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            position: relative;
+        }
+        
+        .content-column.collapsed .content-card-header h6 {
+            transform: rotate(180deg);
+            white-space: nowrap;
+            color: var(--text-primary);
+            margin: 0;
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%) rotate(180deg);
+        }
+        
+        .content-column.collapsed .content-card-header h6 i {
+            display: none;
+        }
+        
+        .content-column.collapsed .content-card-header-actions {
+            position: absolute;
+            top: 8px;
+            left: 50%;
+            transform: translateX(-50%);
+            flex-direction: row;
+            gap: 4px;
+            z-index: 10;
+        }
+        
+        .content-column.collapsed .content-card-header-actions .btn-group {
+            display: none;
+        }
+        
+        .content-column.collapsed .content-card-header-actions a[target="_blank"] {
+            display: none;
+        }
+        
+        .content-column.collapsed .content-card {
+            cursor: pointer;
+        }
+        
+        .content-column.collapsed .content-card:hover {
+            background-color: var(--bg-hover);
+        }
+        
+        .content-column.expanded {
             flex: 1;
-            overflow: hidden;
-            padding: 15px;
         }
-        .main-content .row {
-            overflow-x: auto;
-            overflow-y: hidden;
-            -webkit-overflow-scrolling: touch;
-            flex-wrap: nowrap;
+        
+        /* Lecture note 컬럼 (왼쪽) */
+        .lecture-note-column {
+            flex: 1;
         }
-        .main-content .row > [class*="col-"] {
-            flex-shrink: 0;
-            min-width: 320px;
+        
+        /* Script 컬럼 (중앙) */
+        .script-column {
+            flex: 1.3;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
         }
-        .main-content .row::-webkit-scrollbar {
-            height: 8px;
+        
+        .script-column .content-card {
+            flex: 1;
+            min-height: 0;
         }
-        .main-content .row::-webkit-scrollbar-track {
-            background: #f1f1f1;
+        
+        /* Summary 컬럼 (오른쪽) */
+        .summary-column {
+            flex: 1;
         }
-        .main-content .row::-webkit-scrollbar-thumb {
-            background: #888;
-            border-radius: 4px;
-        }
-        .main-content .row::-webkit-scrollbar-thumb:hover {
-            background: #555;
-        }
-        .card {
+        
+        /* 카드 스타일 - 이미지 기반 디자인 */
+        .content-card {
             height: 100%;
             display: flex;
             flex-direction: column;
-            min-height: 400px;
-        }
-        @media (max-width: 991.98px) {
-            html, body {
-                overflow: auto;
-            }
-            .main-wrapper {
-                min-height: 100vh;
-                height: auto;
-            }
-            .content-wrapper {
-                overflow: visible;
-            }
-            .main-content {
-                overflow: visible;
-                padding: 15px;
-            }
-            .main-content .row {
-                overflow-x: visible;
-                overflow-y: visible;
-                flex-wrap: wrap;
-                height: auto !important;
-            }
-            .main-content .row > [class*="col-"] {
-                flex-shrink: 1;
-                min-width: 100%;
-                width: 100%;
-                height: auto;
-                margin-bottom: 15px;
-            }
-            /* 작은 화면에서 순서 변경: PDF(1) → 요약본(2) → 스크립트(3) → RAG(4) */
-            .main-content .row > .col-lg-4:nth-child(1) {
-                order: 1; /* PDF - 강의 자료 */
-            }
-            .main-content .row > .col-lg-4:nth-child(2) {
-                order: 3; /* 중앙 - 스크립트+RAG */
-            }
-            .main-content .row > .col-lg-4:nth-child(3) {
-                order: 2; /* 요약본 */
-            }
-            /* PDF 카드 고정 높이 */
-            .main-content .row > .col-lg-4:nth-child(1) .card {
-                height: 500px !important;
-                margin-bottom: 15px;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(1) .card-body {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(1) #pdf-container {
-                flex: 1;
-                overflow-y: auto;
-                overflow-x: hidden;
-                height: 0;
-            }
-            /* 요약본 카드 고정 높이 */
-            .main-content .row > .col-lg-4:nth-child(3) .card {
-                height: 400px !important;
-                margin-bottom: 15px;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(3) .card-body {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(3) .summary-container {
-                flex: 1;
-                overflow-y: auto;
-                height: 0;
-            }
-            /* 중앙 컬럼 (스크립트+RAG) 세로 배치 */
-            .middle-column {
-                flex-direction: column;
-                height: auto !important;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .script-card {
-                order: 1;
-                height: calc(100vh - 200px) !important;
-                min-height: 600px;
-                max-height: 1200px;
-                margin-bottom: 15px;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .script-card .card-body {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .script-card .script-container {
-                flex: 1;
-                overflow: hidden;
-                height: 0;
-                min-height: 0;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .script-card .script-container textarea {
-                flex: 1;
-                width: 100%;
-                min-height: 100%;
-                overflow-y: auto;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .rag-card {
-                order: 2;
-                height: calc(100vh - 200px) !important;
-                min-height: 600px;
-                max-height: 1200px;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .rag-card .card-body {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .rag-card .rag-container {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .rag-card .rag-container {
-                flex: 1;
-                overflow: hidden;
-                display: flex;
-                flex-direction: column;
-                min-height: 0;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .rag-card #chat-container {
-                flex: 1;
-                overflow-y: auto;
-                overflow-x: hidden;
-                height: 0;
-                min-height: 0;
-            }
-            .main-content .row > .col-lg-4:nth-child(2) .rag-card .chat-form-wrapper {
-                flex-shrink: 0;
-            }
-            /* 일반 카드 높이 */
-            .card {
-                height: auto;
-                min-height: auto;
-            }
-        }
-        .card-body {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
+            background-color: var(--bg-card);
+            border: none;
+            border-radius: var(--border-radius);
             overflow: hidden;
         }
+        
+        .content-card-header {
+            flex-shrink: 0;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid #37383B;
+            padding: 14px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            min-height: 48px;
+            height: 48px;
+        }
+        
+        .content-card-header h6 {
+            margin: 0;
+            color: var(--text-primary);
+            font-weight: 500;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .content-card-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .content-card-header-actions .btn-group {
+            display: flex;
+            align-items: center;
+            height: 100%;
+        }
+        
+        .content-card-header-actions .btn-group .btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 6px 12px;
+            height: auto;
+        }
+        
+        .content-card-body {
+            flex: 1;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            background-color: var(--bg-card);
+        }
+        
+        /* PDF 컨테이너 */
         #pdf-container {
+            flex: 1;
             overflow-y: auto;
             overflow-x: hidden;
-            background-color: #f8f9fa;
-            flex: 1;
-            padding: 5px 2px 5px 2px;
+            background-color: var(--bg-card);
+            padding: 10px;
         }
+        
         .pdf-page-wrapper {
             margin-bottom: 15px;
             display: flex;
             align-items: flex-start;
             gap: 8px;
         }
+        
         .pdf-page-number {
             flex-shrink: 0;
-            color: #495057;
+            color: var(--text-secondary);
             font-size: 1.1rem;
             font-weight: 500;
             padding-top: 5px;
@@ -247,305 +337,770 @@
             text-align: right;
             padding-right: 3px;
         }
+        
         .pdf-page-wrapper canvas {
             flex: 1;
             max-width: 100%;
             height: auto;
             display: block;
         }
-        .pdf-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
+        
         .pdf-loading {
             text-align: center;
-            padding: 20px;
-            color: #6c757d;
+            padding: 40px;
+            color: var(--text-muted);
         }
+        
+        /* Script 컨테이너 */
         .script-container {
             flex: 1;
             overflow: hidden;
-            margin-bottom: 10px;
-            padding: 0;
-            background-color: #f8f9fa;
-            border-radius: 0.375rem;
+            background-color: #22262B;
             display: flex;
             flex-direction: column;
-            min-height: 0;
         }
+        
         .script-container textarea {
             width: 100%;
             flex: 1;
             min-height: 100%;
-            font-family: monospace;
+            font-family: 'Courier New', monospace;
             resize: none;
             border: none;
-            background-color: transparent;
+            background-color: #22262B !important;
+            color: #C1C1C1 !important;
             padding: 15px;
             box-sizing: border-box;
             overflow-y: auto;
         }
+        
+        .script-container textarea.form-control {
+            background-color: #22262B !important;
+            color: #C1C1C1 !important;
+        }
+        
+        .script-container textarea:disabled {
+            background-color: #22262B !important;
+            color: #C1C1C1 !important;
+            -webkit-text-fill-color: #C1C1C1 !important;
+        }
+        
+        #script-textarea {
+            background-color: #22262B !important;
+            color: #C1C1C1 !important;
+        }
+        
+        #script-textarea.form-control {
+            background-color: #22262B !important;
+        }
+        
+        #script-textarea.form-control:disabled {
+            background-color: #22262B !important;
+            color: #C1C1C1 !important;
+            -webkit-text-fill-color: #C1C1C1 !important;
+        }
+        
+        /* Summary 컨테이너 */
+        .summary-container {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 15px;
+            background-color: var(--bg-card);
+        }
+        
+        /* AI Assistant (Script 컬럼 내부) */
+        .ai-assistant-section {
+            flex: 1;
+            background-color: var(--bg-card);
+            border-top: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            border-radius: var(--border-radius);
+            border-top-left-radius: var(--border-radius);
+            border-top-right-radius: var(--border-radius);
+        }
+        
+        .ai-assistant-header {
+            flex-shrink: 0;
+            background-color: var(--bg-card);
+            border-bottom: 1px solid #37383B;
+            padding: 8px 16px;
+            min-height: 48px;
+            height: 48px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            border-top-left-radius: var(--border-radius);
+            border-top-right-radius: var(--border-radius);
+        }
+        
+        .ai-assistant-header h6 {
+            margin: 0;
+            color: var(--text-primary);
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.875rem;
+            line-height: 1.2;
+        }
+        
+        .ai-assistant-header p {
+            margin: 0;
+            color: var(--text-secondary);
+            font-size: 0.7rem;
+            line-height: 1.2;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
         .rag-container {
             flex: 1;
             display: flex;
             flex-direction: column;
             overflow: hidden;
+            padding: 10px;
+            min-height: 0;
         }
+        
         #chat-container {
             flex: 1;
             overflow-y: auto;
-            border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
+            border: 1px solid #37383B;
+            border-radius: var(--border-radius);
             padding: 15px;
-            background-color: #f8f9fa;
+            background-color: var(--bg-card);
             margin-bottom: 10px;
+            display: flex;
+            flex-direction: column;
         }
+        
         .chat-form-wrapper {
             flex-shrink: 0;
+            border: 1px solid #37383B;
+            border-radius: var(--border-radius);
+            padding: 10px;
+            background-color: var(--bg-card);
         }
+        
+        .chat-form-wrapper .form-control {
+            border-color: #37383B;
+        }
+        
+        .chat-form-wrapper .form-control:focus {
+            border-color: #37383B;
+        }
+        
         .chat-message {
             margin-bottom: 15px;
-            padding: 10px;
-            border-radius: 0.375rem;
         }
+        
         .chat-message.user {
-            background-color: #e7f3ff;
+            background-color: #1A1D22;
+            padding: 12px 16px;
+            border-radius: var(--border-radius);
+            border-bottom-right-radius: 0;
+            margin-left: 40px;
+            margin-right: 0;
+            align-self: flex-end;
+            max-width: 80%;
+            color: var(--text-primary);
         }
+        
         .chat-message.assistant {
-            background-color: #ffffff;
+            background-color: transparent;
+            padding: 0;
+            border: none;
+            margin-left: 0;
+            margin-right: 0;
         }
+        
+        /* 알림 스타일 */
+        .alert {
+            background-color: var(--bg-header);
+            border: 1px solid var(--border-color);
+            border-radius: var(--border-radius);
+            color: var(--text-primary);
+        }
+        
+        .alert-info {
+            background-color: var(--bg-header);
+            border-color: #4A90E2;
+            color: var(--text-primary);
+        }
+        
         .chat-message.assistant .markdown-content {
             line-height: 1.6;
+            color: var(--text-primary);
         }
+        
         .chat-message.assistant .markdown-content h1,
         .chat-message.assistant .markdown-content h2,
         .chat-message.assistant .markdown-content h3 {
             margin-top: 1em;
             margin-bottom: 0.5em;
             font-weight: 600;
+            color: var(--text-primary);
         }
+        
         .chat-message.assistant .markdown-content h1 {
             font-size: 1.5em;
         }
+        
         .chat-message.assistant .markdown-content h2 {
             font-size: 1.3em;
         }
+        
         .chat-message.assistant .markdown-content h3 {
             font-size: 1.1em;
         }
+        
         .chat-message.assistant .markdown-content p {
             margin-bottom: 0.8em;
+            color: var(--text-primary);
         }
+        
         .chat-message.assistant .markdown-content ul,
         .chat-message.assistant .markdown-content ol {
             margin-bottom: 0.8em;
             padding-left: 1.5em;
         }
+        
         .chat-message.assistant .markdown-content li {
             margin-bottom: 0.3em;
+            color: var(--text-primary);
         }
+        
         .chat-message.assistant .markdown-content code {
-            background-color: #f4f4f4;
+            background-color: var(--bg-header);
             padding: 2px 6px;
-            border-radius: 3px;
+            border-radius: 4px;
             font-family: 'Courier New', monospace;
             font-size: 0.9em;
+            color: #4A90E2;
         }
+        
         .chat-message.assistant .markdown-content pre {
-            background-color: #f4f4f4;
+            background-color: var(--bg-header);
             padding: 10px;
-            border-radius: 5px;
+            border-radius: var(--border-radius);
             overflow-x: auto;
             margin-bottom: 0.8em;
+            border: 1px solid var(--border-color);
         }
+        
         .chat-message.assistant .markdown-content pre code {
             background-color: transparent;
             padding: 0;
+            color: var(--text-primary);
         }
+        
         .chat-message.assistant .markdown-content blockquote {
-            border-left: 4px solid #ddd;
+            border-left: 4px solid #4A90E2;
             padding-left: 1em;
             margin-left: 0;
-            color: #666;
+            color: var(--text-secondary);
             margin-bottom: 0.8em;
         }
+        
         .chat-message.assistant .markdown-content table {
             border-collapse: collapse;
             width: 100%;
             margin-bottom: 0.8em;
         }
+        
         .chat-message.assistant .markdown-content table th,
         .chat-message.assistant .markdown-content table td {
-            border: 1px solid #ddd;
+            border: 1px solid var(--border-color);
             padding: 8px;
             text-align: left;
         }
+        
         .chat-message.assistant .markdown-content table th {
-            background-color: #f4f4f4;
+            background-color: var(--bg-header);
             font-weight: 600;
+            color: var(--text-primary);
         }
-        .summary-container {
-            overflow-y: auto;
-            height: 100%;
+        
+        .chat-message.assistant .markdown-content table td {
+            color: var(--text-primary);
         }
-        .middle-column {
+        
+        /* 버튼 스타일 - Bootstrap 덮어쓰기 */
+        .btn {
+            border-radius: var(--border-radius);
+            font-weight: 500;
+            transition: all 0.2s ease;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+        }
+        
+        .btn:hover {
+            background-color: var(--bg-header);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .btn-primary {
+            background-color: #4A90E2;
+            border-color: #4A90E2;
+            color: #FFFFFF;
+        }
+        
+        .btn-primary:hover {
+            background-color: #357ABD;
+            border-color: #357ABD;
+            color: #FFFFFF;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+        
+        .btn-light {
+            background-color: var(--bg-card);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .btn-light:hover {
+            background-color: var(--bg-header);
+            border-color: var(--border-color);
+            color: var(--text-primary);
+        }
+        
+        .download-link {
+            background-color: #FFFFFF !important;
+            border-color: #FFFFFF !important;
+            color: #22262B !important;
+        }
+        
+        .download-link:hover {
+            background-color: #F0F0F0 !important;
+            border-color: #FFFFFF !important;
+            color: #22262B !important;
+        }
+        
+        .download-link i {
+            color: #000000 !important;
+        }
+        
+        .download-link:hover i {
+            color: #000000 !important;
+        }
+        
+        /* 입력 필드 스타일 */
+        .form-control {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            border-radius: var(--border-radius);
+            padding: 8px 12px;
+        }
+        
+        .form-control:focus {
+            background-color: var(--bg-card);
+            border-color: #4A90E2;
+            color: var(--text-primary);
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+        }
+        
+        .form-control::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .chat-input-group {
             display: flex;
-            flex-direction: column;
-            height: 100%;
+            gap: 8px;
         }
-        .script-card {
+        
+        .chat-input-group input {
             flex: 1;
-            margin-bottom: 10px;
         }
-        .rag-card {
-            flex: 1;
+        
+        .chat-input-group button {
+            flex-shrink: 0;
+        }
+        
+        /* 접기/펴기 버튼 아이콘 */
+        .collapse-toggle-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: var(--border-radius);
+        }
+        
+        .collapse-toggle-btn:hover {
+            background-color: var(--bg-header);
+            border-color: var(--border-color);
+        }
+        
+        .collapse-toggle-btn i {
+            transition: transform 0.3s ease;
+        }
+        
+        .collapse-toggle-btn.collapsed i.bi-chevron-left {
+            transform: rotate(180deg);
+        }
+        
+        .collapse-toggle-btn.collapsed i.bi-chevron-right {
+            transform: rotate(180deg);
+        }
+        
+        /* 아코디언 스타일 */
+        .accordion {
+            --bs-accordion-border-color: #37383B;
+            --bs-accordion-border-radius: var(--border-radius);
+            --bs-accordion-border-width: 0;
+        }
+        
+        .accordion-item {
+            background-color: var(--bg-card);
+            border: 1px solid #37383B !important;
+            border-radius: var(--border-radius) !important;
+            margin-bottom: 8px;
+            overflow: hidden;
+        }
+        
+        .accordion-item + .accordion-item {
+            border-top: 1px solid #37383B !important;
+        }
+        
+        .accordion-button {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            border: none !important;
+            border-radius: var(--border-radius) !important;
+            padding: 12px 16px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            width: 100%;
+            gap: 16px;
+        }
+        
+        .accordion-button-title {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        
+        .accordion-button-badges {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+            width: 150px;
+            justify-content: flex-end;
+            min-width: 150px;
+        }
+        
+        .accordion-button-badges .badge {
+            margin: 0 !important;
+            flex-shrink: 0;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+        }
+        
+        .accordion-button-badges .badge.bg-success {
+            min-width: 60px;
+            width: 60px;
+            text-align: center;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        
+        .accordion-button-badges .badge.bg-info {
+            min-width: 70px;
+            width: 70px;
+            text-align: center;
+            padding-left: 8px;
+            padding-right: 8px;
+        }
+        
+        .accordion-button::after {
+            display: none !important;
+        }
+        
+        .accordion-button:not(.collapsed) {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            box-shadow: none;
+            border-bottom: 1px solid #37383B !important;
+            border-radius: var(--border-radius) var(--border-radius) 0 0 !important;
+        }
+        
+        .accordion-button:not(.collapsed)::after {
+            display: none !important;
+        }
+        
+        .accordion-button.collapsed {
+            border-radius: var(--border-radius) !important;
+        }
+        
+        .accordion-button:focus {
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+            border-color: #4A90E2;
+        }
+        
+        .accordion-collapse {
+            border: none;
+        }
+        
+        .accordion-body {
+            background-color: var(--bg-card);
+            color: var(--text-primary);
+            padding: 12px 16px;
+            border-bottom-left-radius: var(--border-radius);
+            border-bottom-right-radius: var(--border-radius);
+        }
+        
+        /* 배지 스타일 */
+        .badge {
+            background-color: var(--bg-header);
+            color: var(--text-primary);
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+        
+        .badge.bg-success {
+            background-color: #4CAF50 !important;
+            color: #FFFFFF !important;
+        }
+        
+        .badge.bg-info {
+            background-color: #4A90E2 !important;
+            color: #FFFFFF !important;
+        }
+        
+        /* 반응형 디자인 */
+        @media (max-width: 991.98px) {
+            .main-content-area {
+                flex-direction: column;
+                overflow-y: auto;
+            }
+            
+            .content-column {
+                flex: 1 1 auto;
+                min-height: 400px;
+            }
+            
+            .content-column.collapsed {
+                flex: 0 0 50px;
+                min-height: 50px;
+            }
+            
+            .content-column.collapsed .content-card-header {
+                writing-mode: vertical-rl;
+                text-orientation: mixed;
+                padding: 8px 8px 16px 8px;
+                height: 100%;
+                justify-content: center;
+                align-items: center;
+                flex-direction: column;
+                position: relative;
+            }
+            
+            .content-column.collapsed .content-card-header h6 {
+                transform: translate(-50%, -50%) rotate(180deg);
+                position: absolute;
+                left: 50%;
+                top: 50%;
+            }
+            
+            .content-column.collapsed .content-card-header h6 i {
+                display: none;
+            }
+            
+            .content-column.collapsed .content-card-header-actions {
+                position: absolute;
+                top: 8px;
+                left: 50%;
+                transform: translateX(-50%);
+                flex-direction: row;
+            }
+            
+            .content-column.collapsed .content-card-header-actions a[target="_blank"] {
+                display: none;
+            }
+            
+            .ai-assistant-section {
+                min-height: 250px;
+                max-height: none;
+            }
+            
+            .rag-container {
+                min-height: 200px;
+            }
+        }
+        
+        @media (max-width: 575.98px) {
+            .top-header {
+                flex-direction: column;
+                gap: 10px;
+                align-items: flex-start;
+            }
+            
+            .top-header-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+            
+            .rag-container {
+                height: 250px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="main-wrapper">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container-fluid">
-                <a class="navbar-brand" href="{% url 'upload' %}">
-                    <i class="bi bi-mortarboard-fill"></i> LectureAI
-                </a>
-                <div class="d-flex gap-2">
-                    <button id="share-link-btn" class="btn btn-light" title="공유하기">
-                        <i class="bi bi-link-45deg"></i> 공유하기
-                    </button>
-                    <a href="{% url 'upload' %}" class="btn btn-light">
-                        <i class="bi bi-arrow-left"></i> 업로드 페이지로 돌아가기
+        <!-- 상단 헤더 -->
+        <div class="top-header">
+            <h4><i class="bi bi-book"></i> {{ lecture.lecture_name }}</h4>
+            <div class="top-header-actions">
+                <div class="download-section btn btn-light btn-sm">
+                    <i class="bi bi-download download-icon"></i>
+                    <span class="download-label">다운로드</span>
+                    <span class="download-divider"></span>
+                    <a href="{% url 'download_summary' lecture.id %}" class="download-link-inner" data-download-type="summary" title="요약 파일 다운로드">
+                        <i class="bi bi-list-check"></i>
+                    </a>
+                    <span class="download-divider"></span>
+                    <a href="{% url 'download_script' lecture.id %}" class="download-link-inner" data-download-type="script" title="스크립트 파일 다운로드">
+                        <i class="bi bi-file-text"></i>
                     </a>
                 </div>
+                <button id="share-link-btn" class="btn btn-light btn-sm" title="공유하기">
+                    <i class="bi bi-link-45deg"></i> 공유하기
+                </button>
+                <a href="{% url 'upload' %}" class="btn btn-light btn-sm">
+                    <i class="bi bi-arrow-left"></i> 업로드 페이지로 돌아가기
+                </a>
             </div>
-        </nav>
+        </div>
 
-        <div class="content-wrapper">
-            <div class="page-title">
-                <h5 class="mb-0">
-                    <i class="bi bi-book"></i> {{ lecture.lecture_name }}
-                </h5>
-            </div>
-
-            <div class="container-fluid main-content">
-                <div class="row g-2 h-100">
-                    <!-- PDF 뷰어 컬럼 -->
-                    <div class="col-lg-4 h-100">
-                        <div class="card h-100">
-                            <div class="card-header bg-info text-white pdf-card-header">
-                                <h6 class="card-title mb-0">
-                                    <i class="bi bi-file-earmark-pdf"></i> 강의 자료 (PDF)
-                                </h6>
-                                <a href="{{ lecture.pdf_file.url }}" target="_blank" class="btn btn-sm btn-light">
-                                    <i class="bi bi-box-arrow-up-right"></i> 새 창에서 열기
-                                </a>
-                            </div>
-                            <div class="card-body p-0">
-                                <div id="pdf-container">
-                                    <div class="pdf-loading">
-                                        <div class="spinner-border spinner-border-sm" role="status">
-                                            <span class="visually-hidden">로딩 중...</span>
-                                        </div>
-                                        <p class="mt-2">PDF를 로드하는 중...</p>
-                                    </div>
+        <!-- 메인 콘텐츠 영역 (3분할 레이아웃) -->
+        <div class="main-content-area">
+            <!-- Lecture note 컬럼 (왼쪽) -->
+            <div class="content-column lecture-note-column" id="lecture-note-column">
+                <div class="content-card">
+                    <div class="content-card-header">
+                        <h6><i class="bi bi-file-earmark-pdf"></i> Lecture note</h6>
+                        <div class="content-card-header-actions">
+                            <a href="{{ lecture.pdf_file.url }}" target="_blank" class="btn btn-sm btn-light" title="새 창에서 열기">
+                                <i class="bi bi-box-arrow-up-right"></i>
+                            </a>
+                            <button class="btn btn-sm collapse-toggle-btn" id="toggle-lecture-note" title="접기/펴기">
+                                <i class="bi bi-chevron-left"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="content-card-body" id="lecture-note-body">
+                        <div id="pdf-container">
+                            <div class="pdf-loading">
+                                <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                    <span class="visually-hidden">로딩 중...</span>
                                 </div>
+                                <p class="mt-2">PDF를 로드하는 중...</p>
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
 
-                    <!-- 중앙 컬럼: 스크립트(상단) + RAG(하단) -->
-                    <div class="col-lg-4 h-100">
-                        <div class="middle-column">
-                            <!-- 스크립트 카드 (상단 절반) -->
-                            <div class="card script-card">
-                                <div class="card-header bg-success text-white">
-                                    <h6 class="card-title mb-0">
-                                        <i class="bi bi-file-text"></i> 음성 스크립트 (STT)
-                                    </h6>
-                                </div>
-                                <div class="card-body">
-                                <div class="script-container">
-                                    <textarea id="script-textarea" class="form-control" disabled>{{ lecture.full_script }}</textarea>
-                                </div>
-                            </div>
-                            </div>
-
-                            <!-- RAG 카드 (하단 절반) -->
-                            <div class="card rag-card">
-                                <div class="card-header bg-warning text-dark">
-                                    <h6 class="card-title mb-0">
-                                        <i class="bi bi-chat-dots"></i> AI 질의응답 (RAG)
-                                    </h6>
-                                </div>
-                                <div class="card-body rag-container">
-                                    <div id="chat-container">
-                                        {% if not is_owner %}
-                                        <div class="alert alert-info mb-0" role="alert">
-                                            <i class="bi bi-info-circle"></i> 강의 소유자만 RAG 질의응답을 사용할 수 있습니다.
-                                        </div>
-                                        {% endif %}
-                                    </div>
-                                    <div class="chat-form-wrapper">
-                                        <form id="chat-form" data-lecture-id="{{ lecture.id }}">
-                                            <div class="input-group input-group-sm">
-                                                <input type="text" class="form-control" id="chat-input" placeholder="강의 내용에 대해 질문해 주세요..." {% if not is_owner %}disabled{% endif %}>
-                                                <button type="submit" class="btn btn-primary" {% if not is_owner %}disabled{% endif %}>
-                                                    <i class="bi bi-send"></i> 전송
-                                                </button>
-                                            </div>
-                                        </form>
-                                    </div>
-                                </div>
-                            </div>
+            <!-- Script 컬럼 (중앙) - Script + AI Assistant -->
+            <div class="content-column script-column" id="script-column">
+                <div class="content-card">
+                    <div class="content-card-header">
+                        <h6><i class="bi bi-file-text"></i> Script</h6>
+                    </div>
+                    <div class="content-card-body">
+                        <div class="script-container">
+                            <textarea id="script-textarea" class="form-control" disabled>{{ lecture.full_script }}</textarea>
                         </div>
                     </div>
-
-                    <!-- 요약본 컬럼 -->
-                    <div class="col-lg-4 h-100">
-                        <div class="card h-100">
-                            <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
-                                <h6 class="card-title mb-0">
-                                    <i class="bi bi-list-check"></i> 소주제별 요약본
-                                </h6>
-                                <div class="btn-group btn-group-sm" role="group">
-                                    <a href="{% url 'download_summary' lecture.id %}" class="btn btn-light btn-sm download-link" data-download-type="summary" title="요약 파일 다운로드">
-                                        <i class="bi bi-download"></i> 요약 다운로드
-                                    </a>
-                                    <a href="{% url 'download_script' lecture.id %}" class="btn btn-light btn-sm download-link" data-download-type="script" title="스크립트 파일 다운로드">
-                                        <i class="bi bi-file-text"></i> 스크립트 다운로드
-                                    </a>
-                                </div>
+                </div>
+                <!-- AI Assistant 섹션 -->
+                <div class="ai-assistant-section">
+                    <div class="ai-assistant-header">
+                        <h6><i class="bi bi-chat-dots"></i> AI Assistant</h6>
+                        <p>Ask questions about your uploaded materials or anything else</p>
+                    </div>
+                    <div class="rag-container">
+                        <div id="chat-container">
+                            {% if not is_owner %}
+                            <div class="alert alert-info mb-0" role="alert">
+                                <i class="bi bi-info-circle"></i> 강의 소유자만 RAG 질의응답을 사용할 수 있습니다.
                             </div>
-                            <div class="card-body summary-container">
-                                {% if summary_list %}
-                                    <div class="accordion" id="summaryAccordion">
-                                        {% for item in summary_list %}
-                                            <div class="accordion-item">
-                                                <h2 class="accordion-header" id="heading{{ forloop.counter }}">
-                                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
-                                                        {{ item.topic }}
+                            {% endif %}
+                        </div>
+                        <div class="chat-form-wrapper">
+                            <form id="chat-form" data-lecture-id="{{ lecture.id }}">
+                                <div class="chat-input-group">
+                                    <input type="text" class="form-control" id="chat-input" placeholder="Ask a question..." {% if not is_owner %}disabled{% endif %}>
+                                    <button type="submit" class="btn btn-primary" {% if not is_owner %}disabled{% endif %}>
+                                        <i class="bi bi-send"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Summary 컬럼 (오른쪽) -->
+            <div class="content-column summary-column" id="summary-column">
+                <div class="content-card">
+                    <div class="content-card-header">
+                        <h6><i class="bi bi-list-check"></i> Summary</h6>
+                        <div class="content-card-header-actions">
+                            <button class="btn btn-sm collapse-toggle-btn" id="toggle-summary" title="접기/펴기">
+                                <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="content-card-body" id="summary-body">
+                        <div class="summary-container">
+                            {% if summary_list %}
+                                <div class="accordion" id="summaryAccordion">
+                                    {% for item in summary_list %}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="heading{{ forloop.counter }}">
+                                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                                                    <span class="accordion-button-title">{{ item.topic }}</span>
+                                                    <span class="accordion-button-badges">
                                                         {% if item.timestamp %}
-                                                            <span class="badge bg-success ms-2">{{ item.timestamp }}</span>
+                                                            <span class="badge bg-success">{{ item.timestamp }}</span>
                                                         {% endif %}
                                                         {% if item.mapped_page %}
-                                                            <span class="badge bg-info ms-2">PDF {{ item.mapped_page }}p</span>
+                                                            <span class="badge bg-info">PDF {{ item.mapped_page }}p</span>
                                                         {% endif %}
-                                                    </button>
-                                                </h2>
-                                                <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#summaryAccordion">
-                                                    <div class="accordion-body">
-                                                        <p><strong>요약:</strong> {{ item.summary }}</p>
-                                                        <small class="text-muted">원본 구간: {{ item.original_segment }}</small>
-                                                    </div>
+                                                    </span>
+                                                </button>
+                                            </h2>
+                                            <div id="collapse{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading{{ forloop.counter }}" data-bs-parent="#summaryAccordion">
+                                                <div class="accordion-body">
+                                                    <p><strong>요약:</strong> {{ item.summary }}</p>
+                                                    <small class="text-muted">원본 구간: {{ item.original_segment }}</small>
                                                 </div>
                                             </div>
-                                        {% endfor %}
-                                    </div>
-                                {% else %}
-                                    <p class="text-muted text-center">요약 정보가 없습니다.</p>
-                                {% endif %}
-                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center">요약 정보가 없습니다.</p>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -728,7 +1283,7 @@
     <script>
         // 다운로드 링크 클릭 시 파일 다운로드 처리
         document.addEventListener('DOMContentLoaded', function() {
-            const downloadLinks = document.querySelectorAll('.download-link');
+            const downloadLinks = document.querySelectorAll('.download-link-inner');
             
             downloadLinks.forEach(function(link) {
                 link.addEventListener('click', function(e) {
@@ -853,6 +1408,51 @@
     </script>
 
     <script>
+        // 박스 접기/펴기 기능
+        document.addEventListener('DOMContentLoaded', function() {
+            // Lecture note 접기/펴기
+            const toggleLectureNote = document.getElementById('toggle-lecture-note');
+            const lectureNoteColumn = document.getElementById('lecture-note-column');
+            
+            if (toggleLectureNote) {
+                toggleLectureNote.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    lectureNoteColumn.classList.toggle('collapsed');
+                    toggleLectureNote.classList.toggle('collapsed');
+                });
+                
+                // 접힌 상태에서 헤더 클릭 시 다시 펼치기
+                lectureNoteColumn.addEventListener('click', function(e) {
+                    if (lectureNoteColumn.classList.contains('collapsed') && !e.target.closest('.collapse-toggle-btn')) {
+                        lectureNoteColumn.classList.remove('collapsed');
+                        toggleLectureNote.classList.remove('collapsed');
+                    }
+                });
+            }
+            
+            // Summary 접기/펴기
+            const toggleSummary = document.getElementById('toggle-summary');
+            const summaryColumn = document.getElementById('summary-column');
+            
+            if (toggleSummary) {
+                toggleSummary.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    summaryColumn.classList.toggle('collapsed');
+                    toggleSummary.classList.toggle('collapsed');
+                });
+                
+                // 접힌 상태에서 헤더 클릭 시 다시 펼치기
+                summaryColumn.addEventListener('click', function(e) {
+                    if (summaryColumn.classList.contains('collapsed') && !e.target.closest('.collapse-toggle-btn')) {
+                        summaryColumn.classList.remove('collapsed');
+                        toggleSummary.classList.remove('collapsed');
+                    }
+                });
+            }
+        });
+    </script>
+
+    <script>
         const chatForm = document.getElementById('chat-form');
         const chatInput = document.getElementById('chat-input');
         const chatContainer = document.getElementById('chat-container');
@@ -911,7 +1511,7 @@
             // 1. 사용자 메시지 UI에 표시
             const userMessageDiv = document.createElement('div');
             userMessageDiv.className = 'chat-message user';
-            userMessageDiv.innerHTML = `<strong><i class="bi bi-person-fill"></i> 나:</strong> ${userMessage}`;
+            userMessageDiv.innerHTML = userMessage;
             chatContainer.appendChild(userMessageDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
             
@@ -924,7 +1524,7 @@
             // 2. 로딩 표시
             const loadingDiv = document.createElement('div');
             loadingDiv.className = 'chat-message assistant';
-            loadingDiv.innerHTML = '<strong><i class="bi bi-robot"></i> AI:</strong> <span class="spinner-border spinner-border-sm" role="status"></span> 답변을 생성하는 중...';
+            loadingDiv.innerHTML = '<span class="spinner-border spinner-border-sm" role="status"></span> 답변을 생성하는 중...';
             chatContainer.appendChild(loadingDiv);
             chatContainer.scrollTop = chatContainer.scrollHeight;
 
@@ -951,10 +1551,7 @@
                 // 마크다운을 HTML로 변환
                 const markdownContent = marked.parse(data.content);
                 
-                aiMessageDiv.innerHTML = `
-                    <strong><i class="bi bi-robot"></i> AI:</strong>
-                    <div class="markdown-content">${markdownContent}</div>
-                `;
+                aiMessageDiv.innerHTML = `<div class="markdown-content">${markdownContent}</div>`;
                 chatContainer.appendChild(aiMessageDiv);
                 chatContainer.scrollTop = chatContainer.scrollHeight;
                 
@@ -963,8 +1560,8 @@
             } catch (error) {
                 loadingDiv.remove();
                 const errorDiv = document.createElement('div');
-                errorDiv.className = 'chat-message assistant alert alert-danger';
-                errorDiv.innerHTML = `<strong><i class="bi bi-exclamation-triangle"></i> 오류:</strong> ${error.message}`;
+                errorDiv.className = 'chat-message assistant';
+                errorDiv.innerHTML = `<div class="markdown-content">오류: ${error.message}</div>`;
                 chatContainer.appendChild(errorDiv);
                 saveChatHistory();
             } finally {
