@@ -11,10 +11,26 @@
     <!-- 전역 다크 모드 CSS -->
     <link href="{% static 'lecture/css/dark-theme.css' %}" rel="stylesheet">
     <style>
+        html {
+            background-color: #37383B;
+        }
         body {
             background-color: #37383B;
             min-height: 100vh;
             padding-bottom: 20px;
+        }
+        .container {
+            background-color: transparent !important;
+        }
+        .row {
+            background-color: transparent !important;
+        }
+        .col-12 {
+            background-color: transparent !important;
+        }
+        .top-header-section {
+            background-color: transparent !important;
+            padding: 14px 0 8px 0;
         }
         .card {
             background-color: #22262B;
@@ -22,6 +38,12 @@
         }
         .card-header {
             background-color: #22262B;
+        }
+        .card-header.bg-primary {
+            background-color: #22262B !important;
+        }
+        .card-header.bg-secondary {
+            background-color: #22262B !important;
         }
         .card-body {
             background-color: #22262B;
@@ -40,13 +62,102 @@
         h1, h2, h5 {
             color: var(--text-primary);
         }
+        .card-header h2 {
+            font-size: 1.1rem;
+        }
+        .card-header h2 i {
+            font-size: 1rem;
+        }
+        .btn-primary {
+            background-color: #22262B;
+            border: 1px solid #37383B;
+            color: var(--text-primary);
+        }
+        .btn-primary:hover {
+            background-color: #2A2F35;
+            border: 1px solid #37383B;
+            color: var(--text-primary);
+        }
+        .form-control {
+            border-radius: 8px;
+        }
+        .btn-primary {
+            border-radius: 8px;
+        }
+        .btn-outline-primary {
+            background-color: #FFFFFF;
+            border: 1px solid #FFFFFF;
+            color: #22262B;
+            border-radius: 8px;
+        }
+        .btn-outline-primary:hover {
+            background-color: #F0F0F0;
+            border: 1px solid #F0F0F0;
+            color: #22262B;
+        }
+        .btn-check:checked + .btn-outline-primary {
+            background-color: #FFFFFF;
+            border-color: #FFFFFF;
+            color: #22262B;
+        }
+        .btn-check:not(:checked) + .btn-outline-primary {
+            background-color: #22262B;
+            border-color: #FFFFFF;
+            color: var(--text-primary);
+        }
+        .btn-check:not(:checked) + .btn-outline-primary:hover {
+            background-color: #2A2F35;
+            border-color: #FFFFFF;
+            color: var(--text-primary);
+        }
+        input[type="file"]::file-selector-button {
+            background-color: #37383B;
+            border-color: #37383B;
+            color: var(--text-primary);
+            padding: 0.375rem 0.75rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            margin-right: 0.5rem;
+        }
+        input[type="file"]::file-selector-button:hover {
+            background-color: #3F4043;
+            border-color: #3F4043;
+        }
+        .btn-lg {
+            font-size: 1.1rem;
+        }
+        .btn-lg i {
+            font-size: 1rem;
+        }
+        /* 저장된 강의 목록 섹션 - 녹색을 흰색으로 변경 */
+        .card:has(.card-header.bg-secondary) .card-body .badge.bg-success,
+        .card .card-header.bg-secondary + .card-body .badge.bg-success {
+            background-color: #1ea868 !important;
+            color: #FFFFFF !important;
+        }
+        .card:has(.card-header.bg-secondary) .card-body .btn-success,
+        .card .card-header.bg-secondary + .card-body .btn-success {
+            background-color: #FFFFFF !important;
+            border-color: #FFFFFF !important;
+            color: #1F2326 !important;
+        }
+        .card:has(.card-header.bg-secondary) .card-body .btn-success:hover,
+        .card .card-header.bg-secondary + .card-body .btn-success:hover {
+            background-color: #F0F0F0 !important;
+            border-color: #F0F0F0 !important;
+            color: #1F2326 !important;
+        }
+        .card:has(.card-header.bg-secondary) .card-body .btn-success i,
+        .card .card-header.bg-secondary + .card-body .btn-success i {
+            color: #1F2326 !important;
+        }
     </style>
 </head>
 <body>
-    <div class="container mt-5">
+    <div class="container" style="padding-top: 5px;">
         <div class="row">
             <div class="col-12">
-                <div class="d-flex justify-content-between align-items-center mb-4">
+                <div class="top-header-section d-flex justify-content-between align-items-center mb-4">
                     <h1 class="mb-0">
                         <i class="bi bi-mortarboard-fill text-primary"></i> LectureAI
                     </h1>
@@ -65,8 +176,8 @@
                     </div>
                 </div>
                 
-                <div class="card mb-5">
-                    <div class="card-header bg-primary text-white">
+                <div class="card" style="margin-bottom: 30px;">
+                    <div class="card-header bg-primary">
                         <h2 class="card-title mb-0">
                             <i class="bi bi-cloud-upload"></i> 새 강의 업로드
                         </h2>
@@ -132,7 +243,7 @@
                 </div>
 
                 <div class="card">
-                    <div class="card-header bg-secondary text-white">
+                    <div class="card-header bg-secondary">
                         <h2 class="card-title mb-0">
                             <i class="bi bi-list-ul"></i> 저장된 강의 목록
                         </h2>

@@ -11,10 +11,25 @@
     <!-- 전역 다크 모드 CSS -->
     <link href="{% static 'lecture/css/dark-theme.css' %}" rel="stylesheet">
     <style>
+        html {
+            background-color: #37383B;
+        }
         body {
             background-color: #37383B;
             min-height: 100vh;
             padding-bottom: 20px;
+        }
+        .container-fluid {
+            background-color: transparent !important;
+        }
+        .container {
+            background-color: transparent !important;
+        }
+        .row {
+            background-color: transparent !important;
+        }
+        .col-12 {
+            background-color: transparent !important;
         }
         .card {
             background-color: #22262B;
@@ -36,21 +51,54 @@
         .table-info-card {
             margin-bottom: 1.5rem;
             background-color: #22262B;
+            border: 1px solid #37383B !important;
+            border-radius: 8px;
+            overflow: hidden;
         }
         .card-header.bg-light {
             background-color: #22262B !important;
             border-color: var(--border-color);
         }
+        .card-header.bg-primary {
+            background-color: #22262B !important;
+        }
+        .card-header.bg-secondary {
+            background-color: #22262B !important;
+        }
         h1, h3, h5 {
             color: var(--text-primary);
+        }
+        h1 {
+            font-size: 1.5rem;
+        }
+        h1 i {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+        .card-header h3 {
+            font-size: 1.1rem;
+        }
+        .card-header h3 i {
+            font-size: 1rem;
+        }
+        .btn-outline-primary {
+            background-color: #FFFFFF;
+            border: 1px solid #FFFFFF;
+            color: #22262B;
+            border-radius: 8px;
+        }
+        .btn-outline-primary:hover {
+            background-color: #F0F0F0;
+            border: 1px solid #F0F0F0;
+            color: #22262B;
         }
     </style>
 </head>
 <body>
-    <div class="container-fluid mt-4">
+    <div class="container" style="padding-top: 5px;">
         <div class="row mb-4">
             <div class="col-12">
-                <div class="d-flex justify-content-between align-items-center">
+                <div class="d-flex justify-content-between align-items-center" style="padding: 14px 0 8px 0;">
                     <h1 class="mb-0">
                         <i class="bi bi-shield-check text-primary"></i> 관리자 대시보드
                     </h1>
@@ -82,7 +130,7 @@
         <div class="row mb-4">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header bg-primary text-white">
+                    <div class="card-header bg-primary">
                         <h3 class="card-title mb-0">
                             <i class="bi bi-graph-up"></i> 처리 통계 (ProcessingStats)
                         </h3>
@@ -93,10 +141,10 @@
                                 <div class="col-md-3">
                                     <div class="card stat-card border-primary">
                                         <div class="card-body text-center">
-                                            <h5 class="card-title text-primary">
-                                                <i class="bi bi-mic"></i> STT 평균
+                                            <h5 class="card-title" style="color: #fd7b7b;">
+                                                <i class="bi bi-mic" style="color: #fd7b7b;"></i> STT 평균
                                             </h5>
-                                            <h2 class="text-primary">{{ processing_stats.audio_stt_avg_sec_per_min|floatformat:2 }}</h2>
+                                            <h2 style="color: #fd7b7b;">{{ processing_stats.audio_stt_avg_sec_per_min|floatformat:2 }}</h2>
                                             <p class="text-muted mb-0">초/분</p>
                                         </div>
                                     </div>
@@ -159,7 +207,7 @@
         <div class="row">
             <div class="col-12">
                 <div class="card">
-                    <div class="card-header bg-secondary text-white">
+                    <div class="card-header bg-secondary">
                         <h3 class="card-title mb-0">
                             <i class="bi bi-database"></i> 데이터베이스 테이블 정보
                         </h3>
@@ -169,7 +217,7 @@
                             <div class="row">
                                 {% for table in table_info %}
                                     <div class="col-md-6 mb-3">
-                                        <div class="card table-info-card border">
+                                        <div class="card table-info-card">
                                             <div class="card-header bg-light">
                                                 <h5 class="card-title mb-0">
                                                     <i class="bi bi-table"></i> 

@@ -411,6 +411,7 @@ OLLAMA_MAX_RETRIES=2
 python manage.py create_admin
 ```
 기본 관리자 계정 (ID: `admin`, 비밀번호: `000000`)이 생성되거나 업데이트됩니다.
+
 기본 ID/PW 수정은 lecture/management/commands/create_admin.py에서 가능합니다.
 
 ### 실행 방법
