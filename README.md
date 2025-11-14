@@ -414,6 +414,12 @@ python manage.py create_admin
 
 기본 ID/PW 수정은 lecture/management/commands/create_admin.py에서 가능합니다.
 
+### ETR 시스템 초기화
+명령어를 통해 통계값을 기본값으로 초기화합니다.
+```bash
+python manage.py init_processing_stats
+```
+
 ### 실행 방법
 1. 의존성 설치: `pip install -r requirements.txt`
 2. 데이터베이스 마이그레이션: `python manage.py migrate`
@@ -449,6 +455,9 @@ python manage.py check_stuck_tasks --minutes 10
 
 # 실제로 변경하지 않고 확인만 (dry-run)
 python manage.py check_stuck_tasks --dry-run
+
+# Celery에 남은 쿼리 모두 종류
+celery -A config purge -f
 ```
 
 이 명령어를 주기적으로 실행하거나 cron job으로 설정하여 추가로 오래된 작업을 감지할 수 있습니다.

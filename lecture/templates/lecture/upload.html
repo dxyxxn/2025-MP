@@ -151,6 +151,12 @@
         .card .card-header.bg-secondary + .card-body .btn-success i {
             color: #1F2326 !important;
         }
+        /* 처리 중 버튼 좌우 사이즈 조정 */
+        .card:has(.card-header.bg-secondary) .card-body .btn-warning.btn-sm,
+        .card .card-header.bg-secondary + .card-body .btn-warning.btn-sm {
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
+        }
     </style>
 </head>
 <body>

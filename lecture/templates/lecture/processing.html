@@ -11,9 +11,18 @@
     <!-- 전역 다크 모드 CSS -->
     <link href="{% static 'lecture/css/dark-theme.css' %}" rel="stylesheet">
     <style>
+        html {
+            background-color: #37383B;
+        }
         body {
             background-color: #37383B;
             min-height: 100vh;
+        }
+        .container {
+            background-color: transparent !important;
+        }
+        .row {
+            background-color: transparent !important;
         }
         .card {
             background-color: #22262B;
@@ -22,8 +31,22 @@
         .card-header {
             background-color: #22262B;
         }
+        .card-header.bg-primary {
+            background-color: #22262B !important;
+            border-bottom: 1px solid #37383B !important;
+        }
+        .card-header.bg-primary.text-white {
+            color: #FFFFFF !important;
+        }
+        .card-header.bg-primary.text-white h2,
+        .card-header.bg-primary.text-white i {
+            color: #FFFFFF !important;
+        }
         .card-body {
             background-color: #22262B;
+            padding-bottom: 2rem !important;
+            padding-left: 1.5rem !important;
+            padding-right: 1.5rem !important;
         }
         h3, h5 {
             color: var(--text-primary);
@@ -32,6 +55,60 @@
             background-color: #22262B;
             border-color: var(--border-color);
             color: var(--text-primary);
+        }
+        .badge.bg-primary {
+            background-color: #22262B !important;
+            color: #FFFFFF !important;
+        }
+        .badge.bg-info {
+            background-color: #22262B !important;
+            color: #FFFFFF !important;
+        }
+        .progress {
+            position: relative;
+        }
+        .progress-bar {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            padding-left: 12px;
+            color: #FFFFFF;
+            font-weight: 500;
+            line-height: 30px;
+        }
+        .progress-bar #progress-text {
+            margin: 0;
+            padding: 0;
+            line-height: 30px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .card-body h3 {
+            margin-top: 16px !important;
+            margin-bottom: 32px !important;
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+        }
+        .progress-bar.bg-primary {
+            background-color: #22262B !important;
+        }
+        .spinner-border.text-primary {
+            color: #22262B !important;
+        }
+        .card-header h2 {
+            font-size: 1.5rem;
+        }
+        .card-header h2 i {
+            font-size: 1.5rem;
+            margin-right: 10px;
+        }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .card-body h3 {
+            margin-top: 0;
         }
     </style>
 </head>
@@ -46,11 +123,7 @@
                         </h2>
                     </div>
                     <div class="card-body text-center">
-                        <div class="spinner-border text-primary mb-4" role="status" style="width: 4rem; height: 4rem;">
-                            <span class="visually-hidden">처리 중...</span>
-                        </div>
-                        
-                        <h3 class="mb-3">
+                        <h3>
                             <i class="bi bi-book"></i> {{ lecture.lecture_name }}
                         </h3>
                         
@@ -61,10 +134,7 @@
                         </div>
                         
                         <div class="mb-3">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h5 class="mb-0">
-                                    <span id="progress-text" class="badge bg-primary fs-6">0/4</span>
-                                </h5>
+                            <div class="d-flex justify-content-end align-items-center mb-2">
                                 <h5 class="mb-0">
                                     <span id="estimated-time" class="badge bg-info fs-6">
                                         <i class="bi bi-clock"></i> 예상 소요 시간: <span id="estimated-time-value">--:--</span>
@@ -73,10 +143,11 @@
                             </div>
                             <div class="progress" style="height: 30px;">
                                 <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 0%">
+                                    <span id="progress-text">0/4</span>
                                 </div>
                             </div>
                         </div>
-                        <div class="alert alert-light border mb-3" style="min-height: 80px;">
+                        <div class="alert alert-light border mb-3 text-center" style="min-height: 80px; display: flex; flex-direction: column; justify-content: center;">
                             <p id="step-description" class="mb-0 fw-bold">
                                 초기화 중...
                             </p>
