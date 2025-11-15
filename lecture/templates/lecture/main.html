@@ -55,12 +55,36 @@
             margin: 0;
             color: var(--text-primary);
             font-weight: 500;
-            font-size: 1.5rem;
+            font-size: 1.625rem;
+            display: flex;
+            align-items: center;
         }
         
         .top-header h4 i {
             font-size: 1.5rem;
             margin-right: 10px;
+        }
+        
+        /* 로고 원형 스타일 */
+        .top-header-logo {
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 10px;
+        }
+        
+        /* 로고 링크 스타일 */
+        .top-header h4 a {
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            cursor: pointer;
+            transition: opacity 0.2s ease;
+        }
+        
+        .top-header h4 a:hover {
+            opacity: 0.8;
         }
         
         .top-header-actions {
@@ -967,7 +991,7 @@
     <div class="main-wrapper">
         <!-- 상단 헤더 -->
         <div class="top-header">
-            <h4><i class="bi bi-book"></i> {{ lecture.lecture_name }}</h4>
+            <h4><a href="{% url 'upload' %}"><img src="{% static 'lecture/images/icon10.png' %}" alt="ReLec Logo" class="top-header-logo"></a> {{ lecture.lecture_name }}</h4>
             <div class="top-header-actions">
                 <div class="download-section btn btn-light btn-sm">
                     <i class="bi bi-download download-icon"></i>
