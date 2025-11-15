@@ -997,12 +997,12 @@
                     <i class="bi bi-download download-icon"></i>
                     <span class="download-label">다운로드</span>
                     <span class="download-divider"></span>
-                    <a href="{% url 'download_summary' lecture.id %}" class="download-link-inner" data-download-type="summary" title="요약 파일 다운로드">
-                        <i class="bi bi-list-check"></i>
-                    </a>
-                    <span class="download-divider"></span>
                     <a href="{% url 'download_script' lecture.id %}" class="download-link-inner" data-download-type="script" title="스크립트 파일 다운로드">
                         <i class="bi bi-file-text"></i>
+                    </a>
+                    <span class="download-divider"></span>
+                    <a href="{% url 'download_summary' lecture.id %}" class="download-link-inner" data-download-type="summary" title="요약 파일 다운로드">
+                        <i class="bi bi-list-check"></i>
                     </a>
                 </div>
                 <button id="share-link-btn" class="btn btn-light btn-sm" title="공유하기">
@@ -1343,7 +1343,7 @@
                             
                             // 파일명이 없으면 기본값 사용
                             if (!filename) {
-                                filename = downloadType === 'summary' ? 'summary.txt' : 'script.txt';
+                                filename = downloadType === 'summary' ? 'summary.pdf' : 'script.pdf';
                             }
                             
                             return response.blob().then(blob => ({ blob, filename }));

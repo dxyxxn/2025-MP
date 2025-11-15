@@ -8,12 +8,102 @@ from django.conf import settings
 from django.contrib import messages
 from django.apps import apps
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.utils import timezone
 import os
 from urllib.parse import quote
 from .models import Lecture, ProcessingStats, CustomUser, PdfChunk, Mapping
 from .tasks import process_lecture_task, calculate_etr_task, start_process_from_url_task # Celery 태스크 임포트
 from .services import init_gemini_models, init_chromadb_client, get_rag_response
 import json
+import re
+import markdown
+from io import BytesIO
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import cm
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Table, TableStyle
+from reportlab.lib.enums import TA_LEFT, TA_CENTER
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.colors import HexColor
+
+# 한글 폰트 등록 함수
+def register_korean_font():
+    """한글 폰트를 찾아서 등록합니다."""
+    korean_font_name = 'KoreanFont'
+    korean_font_bold_name = 'KoreanFont-Bold'
+    
+    # 이미 등록되어 있으면 스킵
+    if korean_font_name in pdfmetrics.getRegisteredFontNames():
+        return korean_font_name
+    
+    # 가능한 폰트 경로 목록
+    font_paths = [
+        # Noto Sans CJK
+        '/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc',
+        '/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc',
+        # Nanum 폰트
+        '/usr/share/fonts/truetype/nanum/NanumGothic.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumBarunGothic.ttf',
+        # Windows 폰트 (WSL) - 대소문자 구분
+        '/mnt/c/Windows/Fonts/malgun.ttf',  # 맑은 고딕
+        '/mnt/c/Windows/Fonts/MALGUN.TTF',  # 맑은 고딕 (대문자)
+        '/mnt/c/Windows/Fonts/gulim.ttc',    # 굴림
+        '/mnt/c/Windows/Fonts/GULIM.TTC',    # 굴림 (대문자)
+        '/mnt/c/Windows/Fonts/batang.ttc',  # 바탕
+        '/mnt/c/Windows/Fonts/BATANG.TTC',  # 바탕 (대문자)
+        # 사용자 폰트 디렉토리
+        os.path.expanduser('~/.fonts/NanumGothic.ttf'),
+        os.path.expanduser('~/.local/share/fonts/NanumGothic.ttf'),
+    ]
+    
+    # 볼드 폰트 경로 목록
+    bold_font_paths = [
+        '/mnt/c/Windows/Fonts/malgunbd.ttf',  # 맑은 고딕 볼드
+        '/mnt/c/Windows/Fonts/MALGUNBD.TTF',
+        '/usr/share/fonts/truetype/nanum/NanumGothicBold.ttf',
+        '/usr/share/fonts/truetype/nanum/NanumBarunGothicBold.ttf',
+    ]
+    
+    # 폰트 찾기
+    font_path = None
+    for path in font_paths:
+        if os.path.exists(path):
+            font_path = path
+            break
+    
+    if font_path:
+        try:
+            # TTC 파일인 경우 (Noto Sans CJK)
+            if font_path.endswith('.ttc'):
+                # TTC 파일은 여러 폰트를 포함하므로 첫 번째 폰트 사용
+                pdfmetrics.registerFont(TTFont(korean_font_name, font_path, subfontIndex=0))
+            else:
+                pdfmetrics.registerFont(TTFont(korean_font_name, font_path))
+            
+            # 볼드 폰트 찾기 및 등록
+            bold_font_path = None
+            for path in bold_font_paths:
+                if os.path.exists(path):
+                    bold_font_path = path
+                    break
+            
+            if bold_font_path:
+                try:
+                    pdfmetrics.registerFont(TTFont(korean_font_bold_name, bold_font_path))
+                    print(f"볼드 폰트 등록 성공: {bold_font_path}")
+                except Exception as e:
+                    print(f"볼드 폰트 등록 실패: {e}")
+            
+            return korean_font_name
+        except Exception as e:
+            print(f"폰트 등록 실패 ({font_path}): {e}")
+    
+    # 폰트를 찾지 못한 경우 기본 폰트 사용 (한글이 깨질 수 있음)
+    print("경고: 한글 폰트를 찾을 수 없습니다. 한글이 제대로 표시되지 않을 수 있습니다.")
+    print("해결 방법: sudo apt-get install fonts-noto-cjk 또는 sudo apt-get install fonts-nanum")
+    return 'Helvetica'  # 기본 폰트
 
 # 로그인 페이지
 def login_view(request):
@@ -324,7 +414,7 @@ def api_lecture_status_view(request, lecture_id):
 @login_required
 def download_summary_view(request, lecture_id):
     """
-    강의의 소주제별 요약본을 TXT 파일로 다운로드합니다.
+    강의의 소주제별 요약본을 Markdown 형식으로 출력한 후 PDF 파일로 다운로드합니다.
     """
     lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
     
@@ -341,50 +431,337 @@ def download_summary_view(request, lecture_id):
         # 매핑 정보 가져오기
         mappings_dict = {mapping.summary_topic: mapping.mapped_pdf_page for mapping in lecture.mappings.all()}
         
-        # TXT 파일 내용 생성
-        txt_content = []
-        txt_content.append(f"강의명: {lecture.lecture_name}\n")
-        txt_content.append(f"생성일: {lecture.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        txt_content.append("=" * 80 + "\n\n")
+        # Markdown 형식으로 내용 생성
+        md_content = []
+        md_content.append(f"# {lecture.lecture_name}\n\n")
+        # 서울 시간대로 변환
+        seoul_time = timezone.localtime(lecture.created_at)
+        md_content.append(f"**문서 생성일:** {seoul_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        md_content.append("---\n\n")
         
         for idx, item in enumerate(summary_list, 1):
-            txt_content.append(f"[소주제 {idx}] {item.get('topic', '제목 없음')}\n")
-            txt_content.append("-" * 80 + "\n")
+            md_content.append(f"### 소주제 {idx}: {item.get('topic', '제목 없음')}\n\n")
             
-            if item.get('timestamp'):
-                txt_content.append(f"타임스탬프: {item.get('timestamp')}\n")
-            
-            if item.get('topic') in mappings_dict:
-                txt_content.append(f"PDF 페이지: {mappings_dict[item.get('topic')]}p\n")
-            
-            txt_content.append(f"\n요약:\n{item.get('summary', '요약 내용 없음')}\n\n")
-            
+            md_content.append(f"### 요약\n\n{item.get('summary', '요약 내용 없음')}\n\n")
+                     
             if item.get('original_segment'):
-                txt_content.append(f"원본 구간:\n{item.get('original_segment')}\n")
+                md_content.append(f"### 원본 구간\n\n")
+
+                md_content.append(f"{item.get('original_segment')}\n\n")
+
+                if item.get('timestamp'):
+                    # 요약 다운로드에서는 타임스탬프를 일반 텍스트로 표시 (볼드/코드 형식 제거)
+                    md_content.append(f" (출처 : 타임스탬프: {item.get('timestamp')} ")
+
+                if item.get('topic') in mappings_dict:
+                    md_content.append(f"PDF 페이지: {mappings_dict[item.get('topic')]}p)\n\n")
+
+            md_content.append("---\n\n")
+        
+        # Markdown을 HTML로 변환
+        markdown_text = ''.join(md_content)
+        html_content = markdown.markdown(markdown_text, extensions=['extra'])
+        
+        # 디버깅용: HTML 출력 (서버 콘솔에서 확인)
+        print("=== 생성된 HTML (처음 1000자) ===")
+        print(html_content[:1000])
+        print("=================================")
+        
+        # reportlab을 사용하여 PDF 생성
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
+                                rightMargin=2*cm, leftMargin=2*cm,
+                                topMargin=2*cm, bottomMargin=2*cm)
+        
+        # 한글 폰트 등록
+        korean_font = register_korean_font()
+        
+        # 스타일 정의
+        styles = getSampleStyleSheet()
+        
+        # 커스텀 스타일 정의 (한글 폰트 사용)
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=HexColor('#2c3e50'),
+            spaceAfter=20,
+            alignment=TA_LEFT,
+            fontName=korean_font
+        )
+        
+        heading2_style = ParagraphStyle(
+            'CustomHeading2',
+            parent=styles['Heading2'],
+            fontSize=18,
+            textColor=HexColor('#34495e'),
+            spaceBefore=20,
+            spaceAfter=12,
+            fontName=korean_font
+        )
+        
+        heading3_style = ParagraphStyle(
+            'CustomHeading3',
+            parent=styles['Heading3'],
+            fontSize=14,
+            textColor=HexColor('#7f8c8d'),
+            spaceBefore=15,
+            spaceAfter=10,
+            fontName=korean_font
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=16,
+            textColor=HexColor('#333333'),
+            spaceAfter=10,
+            fontName=korean_font
+        )
+        
+        # HTML을 reportlab 요소로 변환
+        story = []
+        
+        # HTML을 reportlab이 지원하는 형식으로 간단하게 변환
+        # BeautifulSoup 대신 정규식으로 간단하게 처리
+        import re as re_module
+        
+        # HTML 태그를 제거하고 텍스트만 추출하거나, reportlab이 지원하는 태그만 남기기
+        # 먼저 <strong> -> <b>, <em> -> <i> 변환 (중첩 태그도 처리)
+        # 여러 번 반복하여 중첩된 경우도 처리
+        max_iterations = 10
+        for _ in range(max_iterations):
+            old_content = html_content
+            html_content = re_module.sub(r'<strong>(.*?)</strong>', r'<b>\1</b>', html_content, flags=re_module.DOTALL)
+            html_content = re_module.sub(r'<em>(.*?)</em>', r'<i>\1</i>', html_content, flags=re_module.DOTALL)
+            if old_content == html_content:
+                break
+        
+        # <code> 태그 처리
+        html_content = re_module.sub(r'<code>(.*?)</code>', r'<font face="Courier" color="#e74c3c"><b>\1</b></font>', html_content, flags=re_module.DOTALL)
+        
+        # <hr> 태그는 그대로 유지 (파서에서 처리)
+        
+        # HTML 파싱하여 요소 생성
+        from html.parser import HTMLParser
+        
+        class HTMLToReportLab(HTMLParser):
+            def __init__(self, story, styles):
+                super().__init__()
+                self.story = story
+                self.styles = styles
+                self.current_style = normal_style
+                self.text_buffer = []
+                self.in_paragraph = False
             
-            txt_content.append("\n" + "=" * 80 + "\n\n")
+            def handle_starttag(self, tag, attrs):
+                if tag == 'h1':
+                    self.flush_text()
+                    self.current_style = title_style
+                    self.in_paragraph = True
+                elif tag == 'h2':
+                    self.flush_text()
+                    self.current_style = heading2_style
+                    self.in_paragraph = True
+                elif tag == 'h3':
+                    self.flush_text()
+                    self.current_style = heading3_style
+                    self.in_paragraph = True
+                elif tag == 'p':
+                    # <p> 태그 시작 시 이전 내용을 flush하고 스타일 설정
+                    # 하지만 버퍼는 비우지 않음 (태그 안의 내용을 받기 위해)
+                    if not self.in_paragraph:
+                        self.flush_text()
+                    self.current_style = normal_style
+                    self.in_paragraph = True
+                elif tag == 'hr':
+                    self.flush_text()
+                    # 구분선 추가 (더 눈에 띄게)
+                    self.story.append(Spacer(1, 0.3*cm))
+                    # 구분선을 위한 선 그리기
+                    table = Table([['']], colWidths=[16*cm])
+                    table.setStyle(TableStyle([
+                        ('LINEBELOW', (0, 0), (-1, -1), 1, HexColor('#cccccc')),
+                    ]))
+                    self.story.append(table)
+                    self.story.append(Spacer(1, 0.3*cm))
+                elif tag == 'br':
+                    self.text_buffer.append('<br/>')
+                elif tag == 'strong' or tag == 'b':
+                    # ReportLab의 Paragraph는 <b> 태그를 지원하지만, 한글 폰트에 볼드가 없을 수 있음
+                    # 볼드 폰트가 등록되어 있으면 사용, 없으면 <b> 태그 사용
+                    if 'KoreanFont-Bold' in pdfmetrics.getRegisteredFontNames():
+                        self.text_buffer.append('<font name="KoreanFont-Bold">')
+                    else:
+                        self.text_buffer.append('<b>')
+                elif tag == 'em' or tag == 'i':
+                    self.text_buffer.append('<i>')
+                elif tag == 'code':
+                    self.text_buffer.append('<font face="Courier" color="#e74c3c"><b>')
+            
+            def handle_endtag(self, tag):
+                if tag == 'h1' or tag == 'h2' or tag == 'h3':
+                    self.flush_text()
+                    self.story.append(Spacer(1, 0.3*cm))
+                    self.current_style = normal_style
+                    self.in_paragraph = False
+                elif tag == 'p':
+                    # <p> 태그 종료 시 버퍼 내용을 flush
+                    self.flush_text()
+                    self.story.append(Spacer(1, 0.2*cm))
+                    self.in_paragraph = False
+                elif tag == 'strong' or tag == 'b':
+                    # 볼드 폰트가 등록되어 있으면 </font>로 닫기
+                    if 'KoreanFont-Bold' in pdfmetrics.getRegisteredFontNames():
+                        self.text_buffer.append('</font>')
+                    else:
+                        self.text_buffer.append('</b>')
+                elif tag == 'em' or tag == 'i':
+                    self.text_buffer.append('</i>')
+                elif tag == 'code':
+                    self.text_buffer.append('</b></font>')
+            
+            def handle_data(self, data):
+                # 텍스트 데이터 추가
+                # HTML 파서가 이미 태그를 분리했으므로, 순수 텍스트만 받습니다
+                # ReportLab의 Paragraph는 HTML을 지원하므로, 태그가 아닌 텍스트의 특수 문자만 이스케이프
+                # 하지만 HTML 파서가 이미 태그를 분리했으므로, 여기서 받는 data는 순수 텍스트입니다
+                # ReportLab은 &, <, >를 자동으로 처리하지만, 안전을 위해 &만 처리
+                if data:
+                    # &amp; 같은 엔티티는 그대로 두고, 순수 &만 변환
+                    # 하지만 HTML 파서가 이미 엔티티를 디코딩했을 수 있으므로 주의
+                    # 실제로는 ReportLab이 자동으로 처리하므로 그대로 추가
+                    self.text_buffer.append(data)
+            
+            def flush_text(self):
+                if self.text_buffer:
+                    text = ''.join(self.text_buffer)
+                    if text.strip():
+                        try:
+                            # 중첩 태그 정리
+                            text = self._clean_html(text)
+                            # 디버깅: 생성되는 텍스트 확인
+                            print(f"Paragraph 텍스트: {text[:200]}")
+                            self.story.append(Paragraph(text, self.current_style))
+                        except Exception as e:
+                            import traceback
+                            print(f"Paragraph 생성 오류: {e}")
+                            print(f"텍스트: {text[:100]}")
+                            print(traceback.format_exc())
+                            # HTML 태그 제거 후 재시도
+                            clean_text = re_module.sub(r'<[^>]+>', '', text)
+                            try:
+                                self.story.append(Paragraph(clean_text, self.current_style))
+                            except:
+                                # 그래도 실패하면 텍스트만
+                                self.story.append(Paragraph(clean_text.replace('&', '&amp;'), self.current_style))
+                    self.text_buffer = []
+            
+            def _clean_html(self, text):
+                """HTML 태그를 정리하여 reportlab이 지원하는 형식으로 변환"""
+                # 중첩된 태그 제거
+                while '<b><b>' in text:
+                    text = text.replace('<b><b>', '<b>')
+                while '</b></b>' in text:
+                    text = text.replace('</b></b>', '</b>')
+                while '<i><i>' in text:
+                    text = text.replace('<i><i>', '<i>')
+                while '</i></i>' in text:
+                    text = text.replace('</i></i>', '</i>')
+                return text
+        
+        parser = HTMLToReportLab(story, styles)
+        try:
+            parser.feed(html_content)
+            parser.flush_text()
+        except Exception as e:
+            import traceback
+            print(f"HTML 파싱 오류: {e}")
+            print(traceback.format_exc())
+            # 파싱 실패 시 기본 텍스트로 추가
+            if not story:
+                story.append(Paragraph("PDF 생성 중 오류가 발생했습니다.", normal_style))
+        
+        # story가 비어있으면 기본 내용 추가
+        if not story:
+            story.append(Paragraph("내용이 없습니다.", normal_style))
+        
+        # PDF 생성
+        try:
+            doc.build(story)
+        except Exception as e:
+            import traceback
+            print(f"PDF 빌드 오류: {e}")
+            print(traceback.format_exc())
+            raise Exception(f'PDF 생성 중 오류가 발생했습니다: {str(e)}')
+        
+        pdf_buffer.seek(0)
+        
+        # PDF가 제대로 생성되었는지 확인
+        pdf_size = len(pdf_buffer.getvalue())
+        if pdf_size == 0:
+            raise Exception('PDF 파일이 비어있습니다.')
+        
+        # PDF 헤더 확인 (PDF 파일은 %PDF로 시작해야 함)
+        pdf_buffer.seek(0)
+        header = pdf_buffer.read(4)
+        pdf_buffer.seek(0)
+        if header != b'%PDF':
+            raise Exception('생성된 파일이 유효한 PDF가 아닙니다.')
         
         # 파일명 생성 (한글 파일명 지원)
-        filename = f"{lecture.lecture_name}_요약.txt"
-        # 파일명을 UTF-8로 인코딩하여 브라우저 호환성 확보
+        filename = f"{lecture.lecture_name}_요약.pdf"
         encoded_filename = quote(filename.encode('utf-8'))
         
-        # HttpResponse로 파일 다운로드
-        response = HttpResponse(''.join(txt_content), content_type='text/plain; charset=utf-8')
-        # RFC 5987 형식으로 파일명 설정 (한글 파일명 지원)
+        # HttpResponse로 PDF 파일 다운로드
+        pdf_data = pdf_buffer.read()
+        response = HttpResponse(pdf_data, content_type='application/pdf')
         response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        response['Content-Length'] = len(pdf_data)
         
         return response
         
     except Exception as e:
-        messages.error(request, f'요약 파일 다운로드 중 오류가 발생했습니다: {str(e)}')
-        return redirect('lecture_detail', lecture_id=lecture_id)
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"요약 PDF 생성 오류: {e}")
+        print(error_trace)
+        # 에러 발생 시에도 에러 메시지를 포함한 PDF 반환 시도
+        try:
+            pdf_buffer = BytesIO()
+            doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
+                                    rightMargin=2*cm, leftMargin=2*cm,
+                                    topMargin=2*cm, bottomMargin=2*cm)
+            korean_font = register_korean_font()
+            styles = getSampleStyleSheet()
+            error_style = ParagraphStyle(
+                'ErrorStyle',
+                parent=styles['Normal'],
+                fontSize=12,
+                textColor=HexColor('#e74c3c'),
+                fontName=korean_font
+            )
+            story = [Paragraph(f"PDF 생성 중 오류가 발생했습니다: {str(e)}", error_style)]
+            doc.build(story)
+            pdf_buffer.seek(0)
+            filename = f"{lecture.lecture_name}_요약_오류.pdf"
+            encoded_filename = quote(filename.encode('utf-8'))
+            pdf_data = pdf_buffer.read()
+            response = HttpResponse(pdf_data, content_type='application/pdf')
+            response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+            response['Content-Length'] = len(pdf_data)
+            return response
+        except:
+            # PDF 생성도 실패하면 에러 메시지 반환
+            messages.error(request, f'요약 파일 다운로드 중 오류가 발생했습니다: {str(e)}')
+            return redirect('lecture_detail', lecture_id=lecture_id)
 
 # 6. 스크립트 파일 다운로드
 @login_required
 def download_script_view(request, lecture_id):
     """
-    강의의 타임스탬프가 포함된 전체 스크립트를 TXT 파일로 다운로드합니다.
+    강의의 타임스탬프가 포함된 전체 스크립트를 Markdown 형식으로 출력한 후 PDF 파일로 다운로드합니다.
     """
     lecture = get_object_or_404(Lecture, id=lecture_id, user=request.user)
     
@@ -394,30 +771,335 @@ def download_script_view(request, lecture_id):
         return redirect('lecture_detail', lecture_id=lecture_id)
     
     try:
-        # TXT 파일 내용 생성
-        txt_content = []
-        txt_content.append(f"강의명: {lecture.lecture_name}\n")
-        txt_content.append(f"생성일: {lecture.created_at.strftime('%Y-%m-%d %H:%M:%S')}\n")
-        txt_content.append("=" * 80 + "\n\n")
-        txt_content.append("전체 스크립트 (타임스탬프 포함)\n")
-        txt_content.append("-" * 80 + "\n\n")
-        txt_content.append(lecture.full_script)
+        # Markdown 형식으로 내용 생성
+        md_content = []
+        md_content.append(f"# {lecture.lecture_name}\n\n")
+        # 서울 시간대로 변환
+        seoul_time = timezone.localtime(lecture.created_at)
+        md_content.append(f"**문서 생성일:** {seoul_time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
+        md_content.append("---\n\n")
+        md_content.append("## 전체 스크립트 (타임스탬프 포함)\n\n")
+        md_content.append("---\n\n")
+        
+        # 스크립트를 타임스탬프별로 줄바꿈 처리
+        script_text = lecture.full_script
+        
+        # 타임스탬프 패턴: [MM:SS] 또는 [MM:SS - MM:SS]
+        timestamp_pattern = re.compile(r'\[(\d{2}):(\d{2})(?:\s*-\s*(\d{2}):(\d{2}))?\]')
+        
+        # 모든 타임스탬프의 위치 찾기
+        matches = list(timestamp_pattern.finditer(script_text))
+        
+        # 타임스탬프별로 텍스트 분할하고 줄바꿈 추가
+        if matches:
+            formatted_text = ''
+            for i, match in enumerate(matches):
+                current_index = match.start()
+                next_index = matches[i + 1].start() if i < len(matches) - 1 else len(script_text)
+                
+                # 현재 타임스탬프부터 다음 타임스탬프 전까지의 텍스트 추출
+                segment = script_text[current_index:next_index]
+                
+                # 타임스탬프 뒤의 공백을 줄바꿈으로 변경 (가독성 향상)
+                segment = re.sub(r'\]\s+', ']\n', segment)
+                
+                # 첫 번째가 아니면 줄바꿈 추가
+                if i > 0:
+                    formatted_text += '\n\n'
+                
+                formatted_text += segment
+            
+            script_text = formatted_text
+        else:
+            # 타임스탬프가 없어도 타임스탬프 뒤 공백 처리
+            script_text = re.sub(r'\]\s+', ']\n', script_text)
+        
+        # 타임스탬프를 코드 형식으로 변환 (강조 표시)
+        script_text = re.sub(r'\[(\d{2}:\d{2}(?:\s*-\s*\d{2}:\d{2})?)\]', r'`[\1]`', script_text)
+        
+        # 연속된 줄바꿈 정리 (최대 2개까지만 허용)
+        script_text = re.sub(r'\n{3,}', '\n\n', script_text)
+        
+        md_content.append(script_text)
+        
+        # Markdown을 HTML로 변환
+        markdown_text = ''.join(md_content)
+        html_content = markdown.markdown(markdown_text, extensions=['extra'])
+        
+        # 디버깅용: HTML 출력 (서버 콘솔에서 확인)
+        print("=== 생성된 HTML (처음 1000자) ===")
+        print(html_content[:1000])
+        print("=================================")
+        
+        # reportlab을 사용하여 PDF 생성
+        pdf_buffer = BytesIO()
+        doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
+                                rightMargin=2*cm, leftMargin=2*cm,
+                                topMargin=2*cm, bottomMargin=2*cm)
+        
+        # 한글 폰트 등록
+        korean_font = register_korean_font()
+        
+        # 스타일 정의
+        styles = getSampleStyleSheet()
+        
+        # 커스텀 스타일 정의 (한글 폰트 사용)
+        title_style = ParagraphStyle(
+            'CustomTitle',
+            parent=styles['Heading1'],
+            fontSize=24,
+            textColor=HexColor('#2c3e50'),
+            spaceAfter=20,
+            alignment=TA_LEFT,
+            fontName=korean_font
+        )
+        
+        heading2_style = ParagraphStyle(
+            'CustomHeading2',
+            parent=styles['Heading2'],
+            fontSize=18,
+            textColor=HexColor('#34495e'),
+            spaceBefore=20,
+            spaceAfter=12,
+            fontName=korean_font
+        )
+        
+        normal_style = ParagraphStyle(
+            'CustomNormal',
+            parent=styles['Normal'],
+            fontSize=11,
+            leading=18,
+            textColor=HexColor('#333333'),
+            spaceAfter=8,
+            fontName=korean_font
+        )
+        
+        # HTML을 reportlab 요소로 변환
+        story = []
+        
+        # HTML을 reportlab이 지원하는 형식으로 간단하게 변환
+        import re as re_module
+        
+        # 먼저 <strong> -> <b>, <em> -> <i> 변환 (중첩 태그도 처리)
+        # 여러 번 반복하여 중첩된 경우도 처리
+        max_iterations = 10
+        for _ in range(max_iterations):
+            old_content = html_content
+            html_content = re_module.sub(r'<strong>(.*?)</strong>', r'<b>\1</b>', html_content, flags=re_module.DOTALL)
+            html_content = re_module.sub(r'<em>(.*?)</em>', r'<i>\1</i>', html_content, flags=re_module.DOTALL)
+            if old_content == html_content:
+                break
+        
+        # <code> 태그 처리
+        html_content = re_module.sub(r'<code>(.*?)</code>', r'<font face="Courier" color="#e74c3c"><b>\1</b></font>', html_content, flags=re_module.DOTALL)
+        
+        # <hr> 태그는 그대로 유지 (파서에서 처리)
+        
+        # HTML 파싱하여 요소 생성
+        from html.parser import HTMLParser
+        
+        class HTMLToReportLab(HTMLParser):
+            def __init__(self, story, styles):
+                super().__init__()
+                self.story = story
+                self.styles = styles
+                self.current_style = normal_style
+                self.text_buffer = []
+                self.in_paragraph = False
+            
+            def handle_starttag(self, tag, attrs):
+                if tag == 'h1':
+                    self.flush_text()
+                    self.current_style = title_style
+                    self.in_paragraph = True
+                elif tag == 'h2':
+                    self.flush_text()
+                    self.current_style = heading2_style
+                    self.in_paragraph = True
+                elif tag == 'p':
+                    self.flush_text()
+                    self.current_style = normal_style
+                    self.in_paragraph = True
+                elif tag == 'hr':
+                    self.flush_text()
+                    # 구분선 추가 (더 눈에 띄게)
+                    self.story.append(Spacer(1, 0.3*cm))
+                    # 구분선을 위한 선 그리기
+                    table = Table([['']], colWidths=[16*cm])
+                    table.setStyle(TableStyle([
+                        ('LINEBELOW', (0, 0), (-1, -1), 1, HexColor('#cccccc')),
+                    ]))
+                    self.story.append(table)
+                    self.story.append(Spacer(1, 0.3*cm))
+                elif tag == 'br':
+                    self.text_buffer.append('<br/>')
+                elif tag == 'strong' or tag == 'b':
+                    # ReportLab의 Paragraph는 <b> 태그를 지원하지만, 한글 폰트에 볼드가 없을 수 있음
+                    # 볼드 폰트가 등록되어 있으면 사용, 없으면 <b> 태그 사용
+                    if 'KoreanFont-Bold' in pdfmetrics.getRegisteredFontNames():
+                        self.text_buffer.append('<font name="KoreanFont-Bold">')
+                    else:
+                        self.text_buffer.append('<b>')
+                elif tag == 'em' or tag == 'i':
+                    self.text_buffer.append('<i>')
+                elif tag == 'code':
+                    self.text_buffer.append('<font face="Courier" color="#e74c3c"><b>')
+            
+            def handle_endtag(self, tag):
+                if tag == 'h1' or tag == 'h2':
+                    self.flush_text()
+                    self.story.append(Spacer(1, 0.3*cm))
+                    self.current_style = normal_style
+                    self.in_paragraph = False
+                elif tag == 'p':
+                    self.flush_text()
+                    self.story.append(Spacer(1, 0.2*cm))
+                    self.in_paragraph = False
+                elif tag == 'strong' or tag == 'b':
+                    # 볼드 폰트가 등록되어 있으면 </font>로 닫기
+                    if 'KoreanFont-Bold' in pdfmetrics.getRegisteredFontNames():
+                        self.text_buffer.append('</font>')
+                    else:
+                        self.text_buffer.append('</b>')
+                elif tag == 'em' or tag == 'i':
+                    self.text_buffer.append('</i>')
+                elif tag == 'code':
+                    self.text_buffer.append('</b></font>')
+            
+            def handle_data(self, data):
+                # 텍스트 데이터 추가
+                # HTML 파서가 이미 태그를 분리했으므로, 순수 텍스트만 받습니다
+                # ReportLab의 Paragraph는 HTML을 지원하므로, 태그가 아닌 텍스트의 특수 문자만 이스케이프
+                # 하지만 HTML 파서가 이미 태그를 분리했으므로, 여기서 받는 data는 순수 텍스트입니다
+                # ReportLab은 &, <, >를 자동으로 처리하지만, 안전을 위해 &만 처리
+                if data:
+                    # &amp; 같은 엔티티는 그대로 두고, 순수 &만 변환
+                    # 하지만 HTML 파서가 이미 엔티티를 디코딩했을 수 있으므로 주의
+                    # 실제로는 ReportLab이 자동으로 처리하므로 그대로 추가
+                    self.text_buffer.append(data)
+            
+            def flush_text(self):
+                if self.text_buffer:
+                    text = ''.join(self.text_buffer)
+                    if text.strip():
+                        try:
+                            # 중첩 태그 정리
+                            text = self._clean_html(text)
+                            # 디버깅: 생성되는 텍스트 확인
+                            print(f"Paragraph 텍스트: {text[:200]}")
+                            self.story.append(Paragraph(text, self.current_style))
+                        except Exception as e:
+                            import traceback
+                            print(f"Paragraph 생성 오류: {e}")
+                            print(f"텍스트: {text[:100]}")
+                            print(traceback.format_exc())
+                            # HTML 태그 제거 후 재시도
+                            clean_text = re_module.sub(r'<[^>]+>', '', text)
+                            try:
+                                self.story.append(Paragraph(clean_text, self.current_style))
+                            except:
+                                # 그래도 실패하면 텍스트만
+                                self.story.append(Paragraph(clean_text.replace('&', '&amp;'), self.current_style))
+                    self.text_buffer = []
+            
+            def _clean_html(self, text):
+                """HTML 태그를 정리하여 reportlab이 지원하는 형식으로 변환"""
+                # 중첩된 태그 제거
+                while '<b><b>' in text:
+                    text = text.replace('<b><b>', '<b>')
+                while '</b></b>' in text:
+                    text = text.replace('</b></b>', '</b>')
+                while '<i><i>' in text:
+                    text = text.replace('<i><i>', '<i>')
+                while '</i></i>' in text:
+                    text = text.replace('</i></i>', '</i>')
+                return text
+        
+        parser = HTMLToReportLab(story, styles)
+        try:
+            parser.feed(html_content)
+            parser.flush_text()
+        except Exception as e:
+            import traceback
+            print(f"HTML 파싱 오류: {e}")
+            print(traceback.format_exc())
+            # 파싱 실패 시 기본 텍스트로 추가
+            if not story:
+                story.append(Paragraph("PDF 생성 중 오류가 발생했습니다.", normal_style))
+        
+        # story가 비어있으면 기본 내용 추가
+        if not story:
+            story.append(Paragraph("내용이 없습니다.", normal_style))
+        
+        # PDF 생성
+        try:
+            doc.build(story)
+        except Exception as e:
+            import traceback
+            print(f"PDF 빌드 오류: {e}")
+            print(traceback.format_exc())
+            raise Exception(f'PDF 생성 중 오류가 발생했습니다: {str(e)}')
+        
+        pdf_buffer.seek(0)
+        
+        # PDF가 제대로 생성되었는지 확인
+        pdf_size = len(pdf_buffer.getvalue())
+        if pdf_size == 0:
+            raise Exception('PDF 파일이 비어있습니다.')
+        
+        # PDF 헤더 확인 (PDF 파일은 %PDF로 시작해야 함)
+        pdf_buffer.seek(0)
+        header = pdf_buffer.read(4)
+        pdf_buffer.seek(0)
+        if header != b'%PDF':
+            raise Exception('생성된 파일이 유효한 PDF가 아닙니다.')
         
         # 파일명 생성 (한글 파일명 지원)
-        filename = f"{lecture.lecture_name}_스크립트.txt"
-        # 파일명을 UTF-8로 인코딩하여 브라우저 호환성 확보
+        filename = f"{lecture.lecture_name}_스크립트.pdf"
         encoded_filename = quote(filename.encode('utf-8'))
         
-        # HttpResponse로 파일 다운로드
-        response = HttpResponse(''.join(txt_content), content_type='text/plain; charset=utf-8')
-        # RFC 5987 형식으로 파일명 설정 (한글 파일명 지원)
+        # HttpResponse로 PDF 파일 다운로드
+        pdf_data = pdf_buffer.read()
+        response = HttpResponse(pdf_data, content_type='application/pdf')
         response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+        response['Content-Length'] = len(pdf_data)
         
         return response
         
     except Exception as e:
-        messages.error(request, f'스크립트 파일 다운로드 중 오류가 발생했습니다: {str(e)}')
-        return redirect('lecture_detail', lecture_id=lecture_id)
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"스크립트 PDF 생성 오류: {e}")
+        print(error_trace)
+        # 에러 발생 시에도 에러 메시지를 포함한 PDF 반환 시도
+        try:
+            pdf_buffer = BytesIO()
+            doc = SimpleDocTemplate(pdf_buffer, pagesize=A4,
+                                    rightMargin=2*cm, leftMargin=2*cm,
+                                    topMargin=2*cm, bottomMargin=2*cm)
+            korean_font = register_korean_font()
+            styles = getSampleStyleSheet()
+            error_style = ParagraphStyle(
+                'ErrorStyle',
+                parent=styles['Normal'],
+                fontSize=12,
+                textColor=HexColor('#e74c3c'),
+                fontName=korean_font
+            )
+            story = [Paragraph(f"PDF 생성 중 오류가 발생했습니다: {str(e)}", error_style)]
+            doc.build(story)
+            pdf_buffer.seek(0)
+            filename = f"{lecture.lecture_name}_스크립트_오류.pdf"
+            encoded_filename = quote(filename.encode('utf-8'))
+            pdf_data = pdf_buffer.read()
+            response = HttpResponse(pdf_data, content_type='application/pdf')
+            response['Content-Disposition'] = f"attachment; filename*=UTF-8''{encoded_filename}"
+            response['Content-Length'] = len(pdf_data)
+            return response
+        except:
+            # PDF 생성도 실패하면 에러 메시지 반환
+            messages.error(request, f'스크립트 파일 다운로드 중 오류가 발생했습니다: {str(e)}')
+            return redirect('lecture_detail', lecture_id=lecture_id)
 
 # 관리자 페이지
 @login_required

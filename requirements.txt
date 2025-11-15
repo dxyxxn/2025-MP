@@ -32,3 +32,7 @@ ollama>=0.1.0
 # YouTube video/audio download (YouTube URL을 통한 오디오 다운로드)
 yt-dlp>=2023.12.0
 
+# PDF generation (Markdown to PDF)
+reportlab>=4.0.0
+markdown>=3.5.0
+
