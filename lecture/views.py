@@ -527,6 +527,8 @@ def download_summary_view(request, lecture_id):
         # BeautifulSoup 대신 정규식으로 간단하게 처리
         import re as re_module
         
+        # HTMLToReportLab 클래스에서 사용할 수 있도록 re_module을 클로저로 전달
+        
         # HTML 태그를 제거하고 텍스트만 추출하거나, reportlab이 지원하는 태그만 남기기
         # 먼저 <strong> -> <b>, <em> -> <i> 변환 (중첩 태그도 처리)
         # 여러 번 반복하여 중첩된 경우도 처리
@@ -646,11 +648,12 @@ def download_summary_view(request, lecture_id):
                             self.story.append(Paragraph(text, self.current_style))
                         except Exception as e:
                             import traceback
+                            import re
                             print(f"Paragraph 생성 오류: {e}")
                             print(f"텍스트: {text[:100]}")
                             print(traceback.format_exc())
                             # HTML 태그 제거 후 재시도
-                            clean_text = re_module.sub(r'<[^>]+>', '', text)
+                            clean_text = re.sub(r'<[^>]+>', '', text)
                             try:
                                 self.story.append(Paragraph(clean_text, self.current_style))
                             except:
@@ -990,11 +993,12 @@ def download_script_view(request, lecture_id):
                             self.story.append(Paragraph(text, self.current_style))
                         except Exception as e:
                             import traceback
+                            import re
                             print(f"Paragraph 생성 오류: {e}")
                             print(f"텍스트: {text[:100]}")
                             print(traceback.format_exc())
                             # HTML 태그 제거 후 재시도
-                            clean_text = re_module.sub(r'<[^>]+>', '', text)
+                            clean_text = re.sub(r'<[^>]+>', '', text)
                             try:
                                 self.story.append(Paragraph(clean_text, self.current_style))
                             except:
