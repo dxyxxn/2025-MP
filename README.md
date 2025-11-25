@@ -29,7 +29,7 @@
 
 > ### 🔷 1. 하이브리드 AI 기반 자동 처리 파이프라인
 
-* **Cloud AI(Gemini)와 Local LLM(Ollama/BakLLaVA)**을 결합하여 고속 음성 전사 및 이미지 분석을 수행, 성능과 비용 효율을 동시에 확보했습니다.
+* Cloud AI(Gemini)와 Local LLM(Ollama/BakLLaVA)을 결합하여 고속 음성 전사 및 이미지 분석을 수행, 성능과 비용 효율을 동시에 확보했습니다.
 * 강의 업로드 즉시 STT 처리, PDF 파싱, 구조화 요약, 의미 매핑의 4단계 파이프라인이 병렬적으로 실행되어 대기 시간을 최소화합니다.
 
 > ### 🔷 2. 구조화된 요약 및 PDF 의미 매핑 (Semantic Mapping)
